@@ -251,7 +251,7 @@ def extract_all_resp_metrics(raw_resp_trace_arr, df_censoring, large_window_widt
     ######################################### EXTRACT INSTANTANEOUS METRICS ######################
     #resp rate in rolling window - per sample
     resp_rate_inst, resp_rate_inst_censored = get_resp_rate_inst(breaths_bool, censoring_arr_full, window_length, sampling_rate)
-    '''
+    
     #extract period between breaths - per breath pair
     period_btw_breaths, period_ssd = get_period(breath_indices, sampling_rate)
     
@@ -363,7 +363,7 @@ def extract_all_resp_metrics(raw_resp_trace_arr, df_censoring, large_window_widt
     ######################################## SAVE OUTPUTS ######################################
     df_onesample_per_window = pd.DataFrame(metrics_in_window, columns = ['Window start time','Window end time','Instantaneous resp rate-window mean', 'Instantaneous resp rate - window std', 'Instantaneous RRV period std-window mean','Instantanous RRV period rmssd-window mean', 'Instantaneous periodicity-window mean', 'Instantaneous entropy-window mean','Resp rate-overall window','Period-overall window mean', 'RRV-overall period window std', 'RRV-overall period window rmssd', 'Entropy-overall window'])
     
-    df_onesample_per_window.to_csv(output_name + "_per_window.csv")'''
+    df_onesample_per_window.to_csv(output_name + "_per_window.csv")
     
     ###################################### Also return RR per sec - for comparison with SAII results #####################
     RR_inst_per_sec = downsample_to_once_per_sec(resp_rate_inst, tot_num_samples, tot_length_seconds)
