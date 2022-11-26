@@ -110,4 +110,3 @@ dependencies:
     - ppft==1.7.6.6
     - requests==2.28.1
     - urllib3==1.26.13
-prefix: /home/cic/uromil/miniconda3/envs/phgy_analysis
