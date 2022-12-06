@@ -56,7 +56,7 @@ def find_heart_beats(trace_smoothed, height_val, dist_val, prominence_val, plat_
         
     return beat_indices, beats_bool, beats_toplot, pd.Series(beat_properties['prominences'])
 
-def get_HR_inst(beats, censoring_arr_full, window_length, sampling_rate):
+def get_HR_inst(beats, CENSOR_bool, censoring_arr_full, window_length, sampling_rate):
     '''function to calculate instantaneous HR (based on # of beats in a rolling time window of a few sec)'''
     
     #calculate the number of beats in a time window of the specified length
@@ -68,9 +68,12 @@ def get_HR_inst(beats, censoring_arr_full, window_length, sampling_rate):
     #smooth the HR trace such that there are fewer bumps when the rolling window encounters a new beat
     HR_smooth = HR.rolling(sampling_rate, center = True, win_type = 'gaussian').mean(std=100)
     
-    #censor the necessary samples by setting them to nan
-    HR_smooth_censored = np.copy(HR_smooth)
-    HR_smooth_censored[censoring_arr_full] = np.nan
+    if CENSOR_bool:
+        #censor the necessary samples by setting them to nan
+        HR_smooth_censored = np.copy(HR_smooth)
+        HR_smooth_censored[censoring_arr_full] = np.nan
+    else:
+        HR_smooth_censored = None
         
     return HR_smooth, HR_smooth_censored
 
@@ -126,10 +129,8 @@ def get_pulse_shape_metrics(trace_smooth, beat_indices, sampling_rate):
     
     return peak_quarterwidths_time, peak_halfwidths_time, peak_fullwidths_time
 
-def get_periodiocity_wavelet(trace_smoothed, censoring_arr_full, sampling_rate, time_array,tot_num_samples, output_name, 
-                             wavelet_band_width, wavelet_peak_dist, num_bands_to_detect, num_to_avg):
-    '''this function computes the wavelet transform (frequency spectrum at each point in time - very robust to noise) then 
-    examines how power is concentrated across the frequencies'''
+def get_wavelet(trace_smoothed, sampling_rate, time_array,tot_num_samples, output_name):
+    '''this function computes the wavelet transform (frequency spectrum at each point in time - very robust to noise) '''
  
     # pad the trace to reduce edge effects
     pad_samples = 500
@@ -142,6 +143,21 @@ def get_periodiocity_wavelet(trace_smoothed, censoring_arr_full, sampling_rate, 
     
     #normalize columns to max height to 1
     cwtmatr_norm_height = cwtmatr/np.max(cwtmatr) 
+
+     ################################ PLOT WAVELET TRANSFORM ########################################
+    fig = plt.figure(figsize = (15,5))
+    plt.pcolormesh(time_array, freq[0:50], cwtmatr_norm_height, cmap='jet', shading = 'auto')
+    plt.xlabel('Time (s)')
+    plt.ylabel('Frequency (breaths/s)')
+    plt.colorbar()
+    plt.savefig(output_name +  '_wavelet_transform.png')
+    plt.close()
+
+    return cwtmatr, cwtmatr_norm_height
+
+def get_periodiocity_wavelet(trace_smoothed, CENSOR_bool, censoring_arr_full, sampling_rate, time_array,tot_num_samples, output_name, 
+                             wavelet_band_width, wavelet_peak_dist, num_bands_to_detect, num_to_avg, cwtmatr, cwtmatr_norm_height):
+    '''this function computes properties of wavelet transform'''
 
     #calculate the % that are located above the half max (gives approx measure of spread) and the num of distinct peaks
     periodicity_percent_spectrum_above_halfmax = pd.Series(np.repeat(np.nan, tot_num_samples))
@@ -332,42 +348,20 @@ def get_periodiocity_wavelet(trace_smoothed, censoring_arr_full, sampling_rate, 
                 prev_highfreq = mean_highfreq
             if np.isnan(mean_vhighfreq) == False and (mean_highfreq + wavelet_band_width < mean_vhighfreq):
                 prev_vhighfreq = mean_vhighfreq
-                
-        '''if (col%(100*450)) == 0:
-            print(col)
-            plt.figure()
-            plt.plot(freq[0:50], cwtmatr_norm_height[:,col], '.')
-            plt.plot(freq[0:50][peak_indices], cwtmatr_norm_height[:,col][peak_indices], '*')
-            plt.show()
-            #will see two peaks but may print nan if the freq cannot be classified
-            print('highfreq ' + str(wavelet_highfreq_band[col]))
-            print('lowfreq ' + str(wavelet_lowfreq_band[col]))
-            print('veryhighfreq ' + str(wavelet_vhighfreq_band[col]))
-            print('prev lowfreq' + str(prev_lowfreq))
-            print('prev_highfreq' + str(prev_highfreq))
-            print('prev_vhighfreq' + str(prev_vhighfreq))'''
         
-
-    #censor the periodicity array and peak num arrays
-    periodicity_percent_spectrum_above_halfmax_censored = np.copy(periodicity_percent_spectrum_above_halfmax)
-    periodicity_percent_spectrum_above_halfmax_censored[censoring_arr_full] = np.nan
-    wavelet_peak_num_censored = np.copy(wavelet_peak_num)
-    wavelet_peak_num_censored[censoring_arr_full] = np.nan
-    wavelet_vhighfreq_band[censoring_arr_full] = np.nan
-    wavelet_highfreq_band[censoring_arr_full] = np.nan
-    wavelet_lowfreq_band[censoring_arr_full] = np.nan
-    wavelet_vhighfreq_band_height[censoring_arr_full] = np.nan
-    wavelet_highfreq_band_height[censoring_arr_full] = np.nan
-    wavelet_lowfreq_band_height[censoring_arr_full] = np.nan
-
-     ################################ PLOT WAVELET TRANSFORM ########################################
-    fig = plt.figure(figsize = (15,5))
-    plt.pcolormesh(time_array, freq[0:50], cwtmatr_norm_height, cmap='jet', shading = 'auto')
-    plt.xlabel('Time (s)')
-    plt.ylabel('Frequency (breaths/s)')
-    plt.colorbar()
-    plt.savefig(output_name +  '_wavelet_transform.png')
-    plt.close()
+    if CENSOR_bool:
+        #censor the periodicity array and peak num arrays
+        periodicity_percent_spectrum_above_halfmax[censoring_arr_full] = np.nan
+        wavelet_peak_num_censored = np.copy(wavelet_peak_num)
+        wavelet_peak_num_censored[censoring_arr_full] = np.nan
+        wavelet_vhighfreq_band[censoring_arr_full] = np.nan
+        wavelet_highfreq_band[censoring_arr_full] = np.nan
+        wavelet_lowfreq_band[censoring_arr_full] = np.nan
+        wavelet_vhighfreq_band_height[censoring_arr_full] = np.nan
+        wavelet_highfreq_band_height[censoring_arr_full] = np.nan
+        wavelet_lowfreq_band_height[censoring_arr_full] = np.nan
+    else:
+        wavelet_peak_num_censored = None
 
     del peak_properties
     del cwtmatr
@@ -375,13 +369,14 @@ def get_periodiocity_wavelet(trace_smoothed, censoring_arr_full, sampling_rate, 
     del indices_above_halfmax
     gc.collect()
     
-    return periodicity_percent_spectrum_above_halfmax, periodicity_percent_spectrum_above_halfmax_censored, wavelet_peak_num, wavelet_peak_num_censored, wavelet_vhighfreq_band*60, wavelet_highfreq_band*60, wavelet_lowfreq_band*60, wavelet_vhighfreq_band_height, wavelet_highfreq_band_height, wavelet_lowfreq_band_height
+    return periodicity_percent_spectrum_above_halfmax, wavelet_peak_num, wavelet_peak_num_censored, wavelet_vhighfreq_band*60, wavelet_highfreq_band*60, wavelet_lowfreq_band*60, wavelet_vhighfreq_band_height, wavelet_highfreq_band_height, wavelet_lowfreq_band_height
 
-def get_entropy(trace_smoothed, entropy_type, m_val, censoring_arr_full):
+def get_entropy(trace_smoothed, entropy_type, m_val, CENSOR_bool, censoring_arr_full):
     '''Compute the predictability of the time series in a window by calculating sample entropy'''
     #censor the necessary samples before computing entropy
     trace_smoothed_censored = np.copy(trace_smoothed)
-    trace_smoothed_censored[censoring_arr_full] = np.nan
+    if CENSOR_bool:
+        trace_smoothed_censored[censoring_arr_full] = np.nan
     
     #reshape from (n,) to (n,1)
     signal = np.array(trace_smoothed_censored).reshape(-1,1)
@@ -406,7 +401,7 @@ def get_entropy(trace_smoothed, entropy_type, m_val, censoring_arr_full):
         
     return desired_entropy
 
-def get_entropy_in_inst_window(trace_smoothed, censoring_arr_full, window_size_seconds, sampling_rate, tot_num_samples):
+def get_entropy_in_inst_window(trace_smoothed, CENSOR_bool, censoring_arr_full, window_size_seconds, sampling_rate, tot_num_samples):
     '''this function repeats the get_entropy() function in a for loop of a few seconds - extract instantaneous metric of entropy in this 
     short window'''
     #define window size
@@ -424,7 +419,7 @@ def get_entropy_in_inst_window(trace_smoothed, censoring_arr_full, window_size_s
         short_window_end_sample = short_window_start_sample + short_window_width
         
         #extract entropy in that window
-        entropy_inst[count]= get_entropy(trace_smoothed[short_window_start_sample:short_window_end_sample],'Sample',6,
+        entropy_inst[count]= get_entropy(trace_smoothed[short_window_start_sample:short_window_end_sample],'Sample',6, CENSOR_bool,
                                         censoring_arr_full[short_window_start_sample:short_window_end_sample])
         
         #set next window
@@ -446,179 +441,217 @@ def downsample_to_once_per_sec(series_to_downsample, tot_num_samples, tot_length
     return pd.Series(series_downsampled)
     
 
-def extract_all_pulseox_metrics(raw_trace_arr, df_censoring, large_window_width, large_window_overlap, window_length, tot_num_samples,
+def extract_all_pulseox_metrics(raw_trace_arr, large_window_width, large_window_overlap, window_length, tot_num_samples,
                              tot_length_seconds, output_name, h, d, pr, pl_max, width_val, wavelet_band_width, wavelet_peak_dist,
-                               num_bands_to_detect, invert_bool, num_to_avg):
+                               num_bands_to_detect, invert_bool, num_to_avg, CENSOR_bool, df_censoring, QC_WAVELET_PEAK_bool, QC_PEAK_ONLY_bool, ALL_MEASURES_bool,
+                             ALL_MEASURES_WINDOW_bool):
     ''' This function takes an input pulseox trace (assumed to be multiple minutes long with a 
     sampling rate of 450 samples/s) and computes the instantaneous respiration rate. The window_length argument refers
     the window within which the instantaneous window is computed (in seconds).'''
     sampling_rate = int(tot_num_samples/tot_length_seconds)
     time_array = np.arange(start=0, stop=tot_length_seconds , step=1/sampling_rate)
     
-    #the censoring df is generated from the EPI, so it has length tot_length_seconds 
-    # multiply it by sampling rate to get array of length tot_num_samples - convert so True represents points that ARE censored
-    censoring_arr_full = np.repeat(np.array(df_censoring), sampling_rate) == False
-    indices_of_censored_samples = np.where(censoring_arr_full ==1)[0]
+    if CENSOR_bool:
+        #the censoring df is generated from the EPI, so it has length tot_length_seconds 
+        # multiply it by sampling rate to get array of length tot_num_samples - convert so True represents points that ARE censored
+        censoring_arr_full = np.repeat(np.array(df_censoring), sampling_rate) == False
+        indices_of_censored_samples = np.where(censoring_arr_full ==1)[0]
     
     ######################################### PREPROCESSING #####################################
     #denoise
     trace_smoothed = denoise(raw_trace_arr, sampling_rate, invert_bool)
     del raw_trace_arr
     gc.collect()
-    
+    if QC_PEAK_ONLY_bool == False:
+        wavelet, wavelet_norm = get_wavelet(trace_smoothed, sampling_rate, time_array,tot_num_samples, output_name)
     #extract the heart beat indices
     beat_indices, beats_bool, beats_toplot, beat_prominence = find_heart_beats(trace_smoothed, h, d, pr, pl_max, width_val)
     #find the location of censored breaths within the breath_indices_window
     location_of_censored = np.where(np.isin(beat_indices,indices_of_censored_samples))
-    
-    ######################################### EXTRACT INSTANTANEOUS METRICS ######################
     #resp rate in rolling window - per sample
-    HR_inst, HR_inst_censored = get_HR_inst(beats_bool, censoring_arr_full, window_length, sampling_rate)
+    HR_inst, HR_inst_censored = get_HR_inst(beats_bool, CENSOR_bool, censoring_arr_full, window_length, sampling_rate)
+
+    if ALL_MEASURES_bool == False:
+        ######################################## PLOT PEAKS AND HR FOR QC #############################
+        #plot each 20s segment
+        samples_per_iteration = int(sampling_rate*20)
+        start = 0
+        end = samples_per_iteration
+        while end < tot_num_samples: 
+            fig, ax = plt.subplots(figsize = (15,5))
+            #plot the respiration trace and the detected breaths to make sure that they were properly detected
+            ax.plot(time_array[start:end], 2*trace_smoothed[start:end]+ np.nanmax(HR_inst), label = 'Smoothed Pulseox Trace')
+            ax.plot(time_array[start:end], 2*beats_toplot[start:end]+ np.nanmax(HR_inst), '.', label = 'Detected Beat')
+            ax.plot(time_array[start:end], HR_inst[start:end], label = 'Heart Rate')
+            if CENSOR_bool:
+                ax.fill_between(time_array[start:end], 0, 1, where=censoring_arr_full[start:end], facecolor='red', alpha=0.2,
+                                transform=ax.get_xaxis_transform())
+            ax.set_xlabel('Time (s)')
+            ax.set_title('Quality Control Heart Beat Extraction')
+            ax.legend()
+            fig.savefig(output_name + '_start_' + str(int(time_array[start])) + 's.png')
+            plt.close()
+            start = start + samples_per_iteration
+            end = end + samples_per_iteration
+        #save outputs
+        df_basic = pd.DataFrame({'HR': HR_inst})     
+        df_basic.to_csv(output_name + "HR.csv")
     
-    #extract period between breaths - per beat pair
-    period_btw_beats, period_ssd = get_period(beats_bool, sampling_rate)
-    
-    #extract HRV - std/rmssd of period in rolling window of 4 beats - per beat
-    hrv_inst_std_period, hrv_inst_rmssd_period = get_inst_hrv(period_btw_beats, period_ssd, 4)
-    
-    #extract PVI - % var in amplitudes in rolling window of 9 beats (use min 9 to be sure to cover min 1 complete resp cycle 
-    #- in case resp is slow (~60) and HR fast (~500)- per beat
-    pvi_inst = get_PVI(beat_prominence, 9)
-    
-    #get the width of the pulse (at 1/4, 1/2 heights and base) - per beat
-    width_quart, width_half, width_base= get_pulse_shape_metrics(trace_smoothed, beat_indices,sampling_rate)
-    
-     #extract periodicty - % wavelet above halfmax - per sample
-    periodicty_percent_above_halfmax, periodicty_percent_above_halfmax_cens, wavelet_peak_num, wavelet_peak_num_censored, HR_from_wavelet_vhf_censored, HR_from_wavelet_hf_censored, HR_from_wavelet_lf_censored, wavelet_peak_height_vhf, wavelet_peak_height_hf, wavelet_peak_height_lf = get_periodiocity_wavelet(trace_smoothed,censoring_arr_full,sampling_rate,time_array, tot_num_samples,output_name,wavelet_band_width,wavelet_peak_dist, num_bands_to_detect, int(num_to_avg))
-    
-    #extract entropy in a 5s window 
-    with warnings.catch_warnings():
-        warnings.simplefilter(action = "ignore", category = RuntimeWarning)
-        entropy_inst, entropy_inst_full_length = get_entropy_in_inst_window(trace_smoothed, censoring_arr_full, 5,
-                                                                            sampling_rate, tot_num_samples)
-    
-    ########################################## PLOT INSTANTANEOUS METRICS - for QC ###############
-    #for the metrics where there is only one value per breath, repeat same value until next breath
-    period_btw_beats_toplot = repeat_values_for_plotting(period_btw_beats, beats_bool, beat_indices)
-    hrv_inst_std_period_toplot = repeat_values_for_plotting(hrv_inst_std_period, beats_bool, beat_indices)
-    hrv_inst_rmssd_period_toplot = repeat_values_for_plotting(hrv_inst_rmssd_period, beats_bool, beat_indices)
-    pvi_inst_toplot = repeat_values_for_plotting(pvi_inst, beats_bool, beat_indices)
-    width_quart_toplot = repeat_values_for_plotting(width_quart, beats_bool, beat_indices)
-    
-    #plot each 20s segment
-    samples_per_iteration = int(sampling_rate*20)
-    start = 0
-    end = samples_per_iteration
-    while end < tot_num_samples: 
-        fig, ax = plt.subplots(figsize = (15,5))
-        #plot the respiration trace and the detected breaths to make sure that they were properly detected
-        ax.plot(time_array[start:end], 2*trace_smoothed[start:end]+ np.nanmax(HR_inst), label = 'Smoothed Pulseox Trace')
-        ax.plot(time_array[start:end], 2*beats_toplot[start:end]+ np.nanmax(HR_inst), '.', label = 'Detected Beat')
-        ax.plot(time_array[start:end], HR_inst[start:end], label = 'Resp Rate')
-        ax.plot(time_array[start:end], 50*period_btw_beats_toplot[start:end], label = 'Period (x50)')
-        ax.plot(time_array[start:end], 1000*hrv_inst_std_period_toplot[start:end], label = 'HRV-std (x1000)')
-        ax.plot(time_array[start:end], 1000*hrv_inst_rmssd_period_toplot[start:end], label = 'HRV-rmssd (x1000)')
-        ax.plot(time_array[start:end], pvi_inst_toplot[start:end], label = 'PVI')
-        ax.plot(time_array[start:end], 100*width_quart_toplot[start:end], label = 'Width at quarter height (x100)')
-        ax.plot(time_array[start:end], 5*periodicty_percent_above_halfmax[start:end], label = 'Periodicity (% wavelet above HM)(x5)')
-        ax.plot(time_array[start:end], 50*wavelet_peak_num[start:end], label = 'Number of wavelet peaks (x50)')
-        ax.plot(time_array[start:end], 1000*entropy_inst_full_length[start:end], label = 'Entropy (x1000)')
-        ax.fill_between(time_array[start:end], 0, 1, where=censoring_arr_full[start:end], facecolor='red', alpha=0.2,
-                        transform=ax.get_xaxis_transform())
-        ax.set_xlabel('Time (s)')
-        ax.set_title('Quality Control Heart Beat Extraction')
-        ax.legend()
-        fig.savefig(output_name + '_start_' + str(int(time_array[start])) + 's.png')
-        plt.close()
-        start = start + samples_per_iteration
-        end = end + samples_per_iteration
+    if ALL_MEASURES_bool | ALL_MEASURES_WINDOW_bool:
+        ######################################### EXTRACT INSTANTANEOUS METRICS ######################
+        #resp rate in rolling window - per sample
+        HR_inst, HR_inst_censored = get_HR_inst(beats_bool, CENSOR_bool, censoring_arr_full, window_length, sampling_rate)
+        
+        #extract period between breaths - per beat pair
+        period_btw_beats, period_ssd = get_period(beats_bool, sampling_rate)
+        
+        #extract HRV - std/rmssd of period in rolling window of 4 beats - per beat
+        hrv_inst_std_period, hrv_inst_rmssd_period = get_inst_hrv(period_btw_beats, period_ssd, 4)
+        
+        #extract PVI - % var in amplitudes in rolling window of 9 beats (use min 9 to be sure to cover min 1 complete resp cycle 
+        #- in case resp is slow (~60) and HR fast (~500)- per beat
+        pvi_inst = get_PVI(beat_prominence, 9)
+        
+        #get the width of the pulse (at 1/4, 1/2 heights and base) - per beat
+        width_quart, width_half, width_base= get_pulse_shape_metrics(trace_smoothed, beat_indices,sampling_rate)
+        
+        #extract periodicty - % wavelet above halfmax - per sample
+        periodicty_percent_above_halfmax, wavelet_peak_num, wavelet_peak_num_censored, HR_from_wavelet_vhf, HR_from_wavelet_hf, HR_from_wavelet_lf, wavelet_peak_height_vhf, wavelet_peak_height_hf, wavelet_peak_height_lf = get_periodiocity_wavelet(trace_smoothed, CENSOR_bool, censoring_arr_full, sampling_rate, time_array,tot_num_samples, output_name, 
+                             wavelet_band_width, wavelet_peak_dist, num_bands_to_detect, num_to_avg, wavelet, wavelet_norm)
+         #extract entropy in a 5s window 
+        with warnings.catch_warnings():
+            warnings.simplefilter(action = "ignore", category = RuntimeWarning)
+            entropy_inst, entropy_inst_full_length = get_entropy_in_inst_window(trace_smoothed, CENSOR_bool, censoring_arr_full, 5,
+                                                                                sampling_rate, tot_num_samples)
+        
+        ########################################## PLOT INSTANTANEOUS METRICS - for QC ###############
+        #for the metrics where there is only one value per breath, repeat same value until next breath
+        period_btw_beats_toplot = repeat_values_for_plotting(period_btw_beats, beats_bool, beat_indices)
+        hrv_inst_std_period_toplot = repeat_values_for_plotting(hrv_inst_std_period, beats_bool, beat_indices)
+        hrv_inst_rmssd_period_toplot = repeat_values_for_plotting(hrv_inst_rmssd_period, beats_bool, beat_indices)
+        pvi_inst_toplot = repeat_values_for_plotting(pvi_inst, beats_bool, beat_indices)
+        width_quart_toplot = repeat_values_for_plotting(width_quart, beats_bool, beat_indices)
+        
+        #plot each 20s segment
+        samples_per_iteration = int(sampling_rate*20)
+        start = 0
+        end = samples_per_iteration
+        while end < tot_num_samples: 
+            fig, ax = plt.subplots(figsize = (15,5))
+            #plot the respiration trace and the detected breaths to make sure that they were properly detected
+            ax.plot(time_array[start:end], 2*trace_smoothed[start:end]+ np.nanmax(HR_inst), label = 'Smoothed Pulseox Trace')
+            ax.plot(time_array[start:end], 2*beats_toplot[start:end]+ np.nanmax(HR_inst), '.', label = 'Detected Beat')
+            ax.plot(time_array[start:end], HR_inst[start:end], label = 'Resp Rate')
+            ax.plot(time_array[start:end], 50*period_btw_beats_toplot[start:end], label = 'Period (x50)')
+            ax.plot(time_array[start:end], 1000*hrv_inst_std_period_toplot[start:end], label = 'HRV-std (x1000)')
+            ax.plot(time_array[start:end], 1000*hrv_inst_rmssd_period_toplot[start:end], label = 'HRV-rmssd (x1000)')
+            ax.plot(time_array[start:end], pvi_inst_toplot[start:end], label = 'PVI')
+            ax.plot(time_array[start:end], 100*width_quart_toplot[start:end], label = 'Width at quarter height (x100)')
+            ax.plot(time_array[start:end], 5*periodicty_percent_above_halfmax[start:end], label = 'Periodicity (% wavelet above HM)(x5)')
+            ax.plot(time_array[start:end], 50*wavelet_peak_num[start:end], label = 'Number of wavelet peaks (x50)')
+            ax.plot(time_array[start:end], 1000*entropy_inst_full_length[start:end], label = 'Entropy (x1000)')
+            if CENSOR_bool:
+                ax.fill_between(time_array[start:end], 0, 1, where=censoring_arr_full[start:end], facecolor='red', alpha=0.2,
+                                transform=ax.get_xaxis_transform())
+            ax.set_xlabel('Time (s)')
+            ax.set_title('Quality Control Heart Beat Extraction')
+            ax.legend()
+            fig.savefig(output_name + '_start_' + str(int(time_array[start])) + 's.png')
+            plt.close()
+            start = start + samples_per_iteration
+            end = end + samples_per_iteration
+        
+        ################## SAVE OUTPUTS ################3
+        df_persample = pd.DataFrame({'Pulseox_trace_smoothed': trace_smoothed, 'Beats': beats_toplot, 'HR': HR_inst, 'Period': period_btw_beats_toplot, 
+                                    'HRV_std': hrv_inst_std_period_toplot, 'HRV_rmssd': hrv_inst_rmssd_period_toplot, 'PVI': pvi_inst_toplot, 'Periodicity': periodicty_percent_above_halfmax, 'Entropy': entropy_inst_full_length})     
+        df_persample.to_csv(output_name + "_per_sample.csv")
+      
     
         ######################################### EXTRACT AVERAGE METRICS IN WINDOW ##################
-    #create arrays to store the values for for all windows
-    num_windows = 1+int((tot_length_seconds - large_window_width)/large_window_overlap)#numerator gives last start, frac gives num starts
-    metrics_in_window = np.zeros((num_windows,21))
-    if num_bands_to_detect==3:
-        HR_vhigh_in_window = np.zeros((num_windows,2))
-    
-    #extract a time window
-    large_window_start_realtime = 0 
-    count = 0
-    while large_window_start_realtime + large_window_width <= tot_length_seconds:
-        
-        #calculate when the time window should end (according to the length of the original, uncensored data)
-        large_window_end_realtime = large_window_start_realtime + large_window_width
-        large_window_start_samplenum = large_window_start_realtime*sampling_rate
-        large_window_end_samplenum = large_window_end_realtime*sampling_rate
-        metrics_in_window[count,0] = large_window_start_realtime
-        metrics_in_window[count,1] = large_window_end_realtime
-        
-        #extract only the trace and beats within that window
-        beat_indices_window_nocensor = (beat_indices >= large_window_start_samplenum) & (beat_indices < large_window_end_samplenum)
-        #ignore the breaths that are in a censored area
-        beat_indices_window_censor = np.copy(beat_indices_window_nocensor)
-        beat_indices_window_censor[location_of_censored] = False
-        
-        #extract mean/std of instantaneous HR in that window
-        metrics_in_window[count,2] = np.nanmean(HR_inst_censored[large_window_start_samplenum:large_window_end_samplenum])
-        metrics_in_window[count,3] = np.nanstd(HR_inst_censored[large_window_start_samplenum:large_window_end_samplenum])
-        
-        #extract mean of instantaneous HRV in that window
-        metrics_in_window[count,4] = np.mean(hrv_inst_std_period[beat_indices_window_censor])
-        metrics_in_window[count,5] = np.mean(hrv_inst_rmssd_period[beat_indices_window_censor])
-        
-        #extract mean of instantaneous pvi in that window
-        metrics_in_window[count,6] = np.mean(pvi_inst[beat_indices_window_censor])
-        
-        #extract mean of instantaneous periodicity in that window
-        metrics_in_window[count,7] = np.nanmean(periodicty_percent_above_halfmax_cens[large_window_start_samplenum:large_window_end_samplenum])
-        metrics_in_window[count,8] = np.nanmean(wavelet_peak_num_censored[large_window_start_samplenum:large_window_end_samplenum])
-        metrics_in_window[count,9] = np.nanmean(HR_from_wavelet_hf_censored[large_window_start_samplenum:large_window_end_samplenum])
-        metrics_in_window[count,10] = np.nanmean(HR_from_wavelet_lf_censored[large_window_start_samplenum:large_window_end_samplenum])
-        metrics_in_window[count,11] = np.nanmean(wavelet_peak_height_hf[large_window_start_samplenum:large_window_end_samplenum])
-        metrics_in_window[count,12] = np.nanmean(wavelet_peak_height_lf[large_window_start_samplenum:large_window_end_samplenum])
-        
-        #extract mean of instantaneous entropy in that window
-        metrics_in_window[count,13] = np.mean(entropy_inst_full_length[large_window_start_samplenum:large_window_end_samplenum])
-        
-        #extract overall resp rate across whole window (can't censor breaths or will give inaccurate rate
-        metrics_in_window[count,14] = (60/large_window_width)*(beat_indices[beat_indices_window_nocensor].size)
-        
-        #extract mean period and variability in period (RRV) across whole window
-        metrics_in_window[count,15] = np.mean(period_btw_beats[beat_indices_window_censor])
-        metrics_in_window[count,16] = np.std(period_btw_beats[beat_indices_window_censor])
-        metrics_in_window[count,17] = np.mean(period_ssd[beat_indices_window_censor])**(1/2)
-        
-        #extract mean widths in that window
-        metrics_in_window[count,18] = np.mean(width_quart[beat_indices_window_censor])
-        metrics_in_window[count,19] = np.mean(width_half[beat_indices_window_censor])
-        metrics_in_window[count,20] = np.mean(width_base[beat_indices_window_censor])
-        
-        #NOTE: I am NOT extracting the entropy across the whole window due to prohibitive memory/time constraints - also preliminary         
-        #analysis showed that entropy across the whole window is very highly correlated with mean of instantaneous entropy.
-        
-        #only if I expect 3 wavelet freq, calc the means in windows
+    if ALL_MEASURES_WINDOW_bool:
+        #create arrays to store the values for for all windows
+        num_windows = 1+int((tot_length_seconds - large_window_width)/large_window_overlap)#numerator gives last start, frac gives num starts
+        metrics_in_window = np.zeros((num_windows,21))
         if num_bands_to_detect==3:
-            HR_vhigh_in_window[count, 0] = np.nanmean(HR_from_wavelet_vhf_censored[large_window_start_samplenum:large_window_end_samplenum])
-            HR_vhigh_in_window[count, 1] = np.nanmean(wavelet_peak_height_vhf[large_window_start_samplenum:large_window_end_samplenum])
+            HR_vhigh_in_window = np.zeros((num_windows,2))
         
-        #set the start time of the next window in realtime
-        large_window_start_realtime = large_window_end_realtime - large_window_overlap
-        count = count+1
-    
-    ######################################## SAVE OUTPUTS ######################################
-    df_onesample_per_window = pd.DataFrame(metrics_in_window, columns = ['Window start time','Window end time','Instantaneous HR-window mean', 'Instantaneous HR - window std', 'Instantaneous HRV period std-window mean','Instantanous HRV period rmssd-window mean', 'Instantaneous PVI-window mean','Instantaneous periodicity-window mean', 'Instantaneous number of wavelet peaks-window mean','Instantaneous highfreq HR from wavelet-window mean', 'Instantaneous lowfreq HR from wavelet-window mean', 'Instantaneous highfreq peak height-window mean','Instantaneous lowfreq peak height-window mean','Instantaneous entropy-window mean','HR-overall window','Period-overall window mean', 'HRV-overall period window std', 'HRV-overall period window rmssd', 'Width at quarter height-overall window mean', 'width at half height-overall window mean','Width at base-overall window mean'])
-    if num_bands_to_detect==3:
-        df_onesample_per_window.insert(9, 'Instantaneous veryhighfreq HR from wavelet-window mean', HR_vhigh_in_window[:, 0])
-        df_onesample_per_window.insert(12, 'Instantaneous veryhighfreq peak height-window mean', HR_vhigh_in_window[:, 1])
-    
-    df_onesample_per_window.to_csv(output_name + "_per_window.csv")
-    
-    ###################################### Also return HR per sec - for comparison with SAII results #####################
-    HR_inst_per_sec = downsample_to_once_per_sec(HR_inst, tot_num_samples, tot_length_seconds)
-    HR_inst_cens_per_sec = downsample_to_once_per_sec(pd.Series(HR_inst_censored), tot_num_samples, tot_length_seconds)
-    df_HR_onesample_per_sec = pd.concat([HR_inst_per_sec, HR_inst_cens_per_sec], axis = 1, ignore_index = True)
-    df_HR_onesample_per_sec.columns = ['HR_inst','HR_inst_censored']
-    df_HR_onesample_per_sec.to_csv(output_name + "_HR_per_sec.csv")
+        #extract a time window
+        large_window_start_realtime = 0 
+        count = 0
+        while large_window_start_realtime + large_window_width <= tot_length_seconds:
+            
+            #calculate when the time window should end (according to the length of the original, uncensored data)
+            large_window_end_realtime = large_window_start_realtime + large_window_width
+            large_window_start_samplenum = large_window_start_realtime*sampling_rate
+            large_window_end_samplenum = large_window_end_realtime*sampling_rate
+            metrics_in_window[count,0] = large_window_start_realtime
+            metrics_in_window[count,1] = large_window_end_realtime
+            
+            #extract only the trace and beats within that window
+            beat_indices_window_nocensor = (beat_indices >= large_window_start_samplenum) & (beat_indices < large_window_end_samplenum)
+            #ignore the breaths that are in a censored area
+            beat_indices_window = np.copy(beat_indices_window_nocensor)
+            if CENSOR_bool:
+                beat_indices_window[location_of_censored] = False
+            
+            #extract mean/std of instantaneous HR in that window
+            if CENSOR_bool:
+                metrics_in_window[count,2] = np.nanmean(HR_inst_censored[large_window_start_samplenum:large_window_end_samplenum])
+                metrics_in_window[count,3] = np.nanstd(HR_inst_censored[large_window_start_samplenum:large_window_end_samplenum])
+            else:
+                metrics_in_window[count,2] = np.nanmean(HR_inst[large_window_start_samplenum:large_window_end_samplenum])
+                metrics_in_window[count,3] = np.nanstd(HR_inst[large_window_start_samplenum:large_window_end_samplenum])
+            
+            #extract mean of instantaneous HRV in that window
+            metrics_in_window[count,4] = np.mean(hrv_inst_std_period[beat_indices_window])
+            metrics_in_window[count,5] = np.mean(hrv_inst_rmssd_period[beat_indices_window])
+            
+            #extract mean of instantaneous pvi in that window
+            metrics_in_window[count,6] = np.mean(pvi_inst[beat_indices_window])
+            
+            #extract mean of instantaneous periodicity in that window
+            metrics_in_window[count,7] = np.nanmean(periodicty_percent_above_halfmax[large_window_start_samplenum:large_window_end_samplenum])
+            metrics_in_window[count,8] = np.nanmean(wavelet_peak_num[large_window_start_samplenum:large_window_end_samplenum])
+            metrics_in_window[count,9] = np.nanmean(HR_from_wavelet_hf[large_window_start_samplenum:large_window_end_samplenum])
+            metrics_in_window[count,10] = np.nanmean(HR_from_wavelet_lf[large_window_start_samplenum:large_window_end_samplenum])
+            metrics_in_window[count,11] = np.nanmean(wavelet_peak_height_hf[large_window_start_samplenum:large_window_end_samplenum])
+            metrics_in_window[count,12] = np.nanmean(wavelet_peak_height_lf[large_window_start_samplenum:large_window_end_samplenum])
+            
+            #extract mean of instantaneous entropy in that window
+            metrics_in_window[count,13] = np.mean(entropy_inst_full_length[large_window_start_samplenum:large_window_end_samplenum])
+            
+            #extract overall resp rate across whole window (can't censor breaths or will give inaccurate rate
+            metrics_in_window[count,14] = (60/large_window_width)*(beat_indices[beat_indices_window_nocensor].size)
+            
+            #extract mean period and variability in period (RRV) across whole window
+            metrics_in_window[count,15] = np.mean(period_btw_beats[beat_indices_window])
+            metrics_in_window[count,16] = np.std(period_btw_beats[beat_indices_window])
+            metrics_in_window[count,17] = np.mean(period_ssd[beat_indices_window])**(1/2)
+            
+            #extract mean widths in that window
+            metrics_in_window[count,18] = np.mean(width_quart[beat_indices_window])
+            metrics_in_window[count,19] = np.mean(width_half[beat_indices_window])
+            metrics_in_window[count,20] = np.mean(width_base[beat_indices_window])
+            
+            #NOTE: I am NOT extracting the entropy across the whole window due to prohibitive memory/time constraints - also preliminary         
+            #analysis showed that entropy across the whole window is very highly correlated with mean of instantaneous entropy.
+            
+            #only if I expect 3 wavelet freq, calc the means in windows
+            if num_bands_to_detect==3:
+                HR_vhigh_in_window[count, 0] = np.nanmean(HR_from_wavelet_vhf[large_window_start_samplenum:large_window_end_samplenum])
+                HR_vhigh_in_window[count, 1] = np.nanmean(wavelet_peak_height_vhf[large_window_start_samplenum:large_window_end_samplenum])
+            
+            #set the start time of the next window in realtime
+            large_window_start_realtime = large_window_end_realtime - large_window_overlap
+            count = count+1
+        
+        ######################################## SAVE OUTPUTS ######################################
+        df_onesample_per_window = pd.DataFrame(metrics_in_window, columns = ['Window start time','Window end time','Instantaneous HR-window mean', 'Instantaneous HR - window std', 'Instantaneous HRV period std-window mean','Instantanous HRV period rmssd-window mean', 'Instantaneous PVI-window mean','Instantaneous periodicity-window mean', 'Instantaneous number of wavelet peaks-window mean','Instantaneous highfreq HR from wavelet-window mean', 'Instantaneous lowfreq HR from wavelet-window mean', 'Instantaneous highfreq peak height-window mean','Instantaneous lowfreq peak height-window mean','Instantaneous entropy-window mean','HR-overall window','Period-overall window mean', 'HRV-overall period window std', 'HRV-overall period window rmssd', 'Width at quarter height-overall window mean', 'width at half height-overall window mean','Width at base-overall window mean'])
+        if num_bands_to_detect==3:
+            df_onesample_per_window.insert(9, 'Instantaneous veryhighfreq HR from wavelet-window mean', HR_vhigh_in_window[:, 0])
+            df_onesample_per_window.insert(12, 'Instantaneous veryhighfreq peak height-window mean', HR_vhigh_in_window[:, 1])
+        
+        df_onesample_per_window.to_csv(output_name + "_per_window.csv")
             
     #delete unnecessary ones that are per sample
     del time_array
