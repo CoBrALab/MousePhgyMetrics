@@ -12,7 +12,14 @@ Download from github into the desired folder:
 `git clone https://github.com/CoBrALab/MousePhgyMetrics`
 
 Create the environment from the provided environment file:`conda env create --file environment.yml`
-
+# **Use**
+1. `source activate env`
+2. open python
+3. ``` 
+    import respiration_functions
+    import cardiac_functions
+    ```
+    
 # **Functions** 
 Respiration:
 ```
