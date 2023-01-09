@@ -29,7 +29,6 @@ from scipy import signal
 from scipy.signal import find_peaks
 import warnings
 import EntropyHub as EH
-import warnings
 
 def repeat_values_for_plotting(data_to_repeat, breaths_bool, breath_indices):
     '''For metrics where there is only 1 value per breath - duplicate the value until the next breath to create array
@@ -62,10 +61,10 @@ def denoise_detrend(raw_trace, sampling_rate, invert_bool):
     
     return trace_smoothed_detrend
 
-def find_breaths(resp_trace_smoothed_detrend, h, d, pr, t, pl_min, pl_max, wl):
+def find_breaths(resp_trace_smoothed_detrend, h, d, pr, pl_min, pl_max, wl):
     '''function to detect breaths throughout entire trace using peak detection algorithm'''
     #find most prominent peaks
-    breath_indices, _ = find_peaks(resp_trace_smoothed_detrend, height = h, distance = d, prominence = pr, threshold = t,
+    breath_indices, properties = find_peaks(resp_trace_smoothed_detrend, height = h, distance = d, prominence = pr,
                                    plateau_size = (pl_min,pl_max), wlen = wl)
     
     #create boolean breath array
@@ -239,12 +238,13 @@ def get_entropy_in_inst_window(resp_trace_smoothed_detrend, CENSOR_bool, censori
     return entropy_inst, entropy_inst_full_length
 
 
-def extract_all_resp_metrics(raw_resp_trace_arr, large_window_width, large_window_overlap, window_length, tot_num_samples,
-                             tot_length_seconds, output_name, invert_bool, h, d, pr, t, pl_min, pl_max, wl, CENSOR_bool, df_censoring, QC_WAVELET_PEAK_bool, QC_PEAK_ONLY_bool, ALL_MEASURES_bool,
+def extract_all_resp_metrics(raw_resp_trace_csv, large_window_width, large_window_overlap, window_length, tot_num_samples,
+                             tot_length_seconds, output_name, invert_bool, h, d, pr, pl_min, pl_max, wl, CENSOR_bool, df_censoring, QC_WAVELET_PEAK_bool, QC_PEAK_ONLY_bool, ALL_MEASURES_bool,
                              ALL_MEASURES_WINDOW_bool):
     ''' This function takes an input respiration trace (assumed to be multiple minutes long with a 
     sampling rate of 225 samples/s) and computes the instantaneous respiration rate. The window_length argument refers
     the window within which the instantaneous window is computed (in seconds).'''
+    raw_resp_trace_arr = pd.read_csv(raw_resp_trace_csv, header = None)[0]
     sampling_rate = int(tot_num_samples/tot_length_seconds)
     time_array = np.arange(start=0, stop=tot_length_seconds , step=1/sampling_rate)
 
@@ -253,6 +253,8 @@ def extract_all_resp_metrics(raw_resp_trace_arr, large_window_width, large_windo
         # multiply it by sampling rate to get array of length tot_num_samples - convert so True represents points that ARE censored
         censoring_arr_full = np.repeat(np.array(df_censoring), sampling_rate) == False
         indices_of_censored_samples = np.where(censoring_arr_full ==1)[0]
+    else:
+        censoring_arr_full = None
     
     ######################################### PREPROCESSING #####################################
     #denoise and detrend
@@ -261,14 +263,17 @@ def extract_all_resp_metrics(raw_resp_trace_arr, large_window_width, large_windo
         #compute wavelet transform
         wavelet = get_wavelet(resp_trace_smoothed_detrend, CENSOR_bool, censoring_arr_full, sampling_rate, time_array,tot_num_samples, output_name)
     #extract the breath indices
-    breath_indices, breaths_bool, breaths_toplot = find_breaths(resp_trace_smoothed_detrend, h, d, pr, t, pl_min, pl_max,wl)
-    #find the location of censored breaths within the breath_indices_window
-    location_of_censored = np.where(np.isin(breath_indices,indices_of_censored_samples))
+    breath_indices, breaths_bool, breaths_toplot = find_breaths(resp_trace_smoothed_detrend, h, d, pr, pl_min, pl_max,wl)
+    
+    if CENSOR_bool:
+        #find the location of censored breaths within the breath_indices_window
+        location_of_censored = np.where(np.isin(breath_indices,indices_of_censored_samples))
 
-    if ALL_MEASURES_bool == FALSE:
+    if ALL_MEASURES_bool == False:
         ######################################## PLOT PEAKS AND RR FOR QC ##########################
         #resp rate in rolling window - per sample
-        resp_rate_inst, resp_rate_inst_censored = get_resp_rate_inst(breaths_bool, censoring_arr_full, window_length, sampling_rate)
+        resp_rate_inst, resp_rate_inst_censored = get_resp_rate_inst(breaths_bool, CENSOR_bool, censoring_arr_full, window_length, 
+                                                                     sampling_rate)
 
         #plot each 30s segment
         samples_per_iteration = int(sampling_rate*30)
