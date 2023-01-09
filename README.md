@@ -26,7 +26,7 @@ Create the environment from the provided environment file:`conda env create --fi
 Respiration:
 ```
 respiration_functions.extract_all_resp_metrics(raw_resp_trace_arr, large_window_width, large_window_overlap, window_length, tot_num_samples,
-                             tot_length_seconds, output_name, invert_bool, h, d, pr, pl_min, pl_max, wl, 
+                             tot_length_seconds, output_name, image_output_type, invert_bool, h, d, pr, pl_min, pl_max, wl, 
                              CENSOR_bool, df_censoring, QC_WAVELET_PEAK_bool, QC_PEAK_ONLY_bool, ALL_MEASURES_bool, 
                              ALL_MEASURES_WINDOW_bool)
  <raw_resp_trace_arr> : csv containing a single column of the raw respiration trace samples
@@ -36,6 +36,7 @@ respiration_functions.extract_all_resp_metrics(raw_resp_trace_arr, large_window_
  --tot_num_samples: the total number of samples of the raw respiration trace.
  --tot_length_seconds: the total duration in seconds of the raw respiration trace.
  --output_name: path and name of the output files
+ --image_output_type: 'svg' (for publication-quality) or 'png'
  --invert_bool: whether or not the respiration trace should be inverted (e.g. if the respiration pillow was placed upside down). Either True or False.
  --h: height parameter controls peaks that are detected. Sets minimum peak height. Default 0.25.
  --d: distance parameter controls peaks that are detected. Sets minimmum distance in number of samples between peaks. Default 55.

@@ -138,12 +138,15 @@ def get_wavelet(resp_trace_smoothed_detrend, CENSOR_bool, censoring_arr_full, sa
     cwtmatr_norm_height = cwtmatr/np.max(cwtmatr) 
     
      ################################ PLOT WAVELET TRANSFORM ########################################
-    fig = plt.figure(figsize = (15,5))
-    plt.pcolormesh(time_array, freq[0:100], cwtmatr_norm_height, cmap='jet', shading = 'auto')
+    fig = plt.figure(figsize = (12,4))
+    plt.pcolormesh(time_array, 60*freq[0:100], cwtmatr_norm_height, cmap='jet', shading = 'auto')
     plt.xlabel('Time (s)')
-    plt.ylabel('Frequency (breaths/s)')
+    plt.ylabel('Frequency (bpm)')
     plt.colorbar()
-    plt.savefig(output_name +  '_wavelet_transform.png')
+    if image_output_type == 'svg':
+        plt.savefig(output_name +  '_wavelet_transform.svg')
+    else:
+        plt.savefig(output_name +  '_wavelet_transform.png')
     
     return cwtmatr
 
@@ -239,7 +242,7 @@ def get_entropy_in_inst_window(resp_trace_smoothed_detrend, CENSOR_bool, censori
 
 
 def extract_all_resp_metrics(raw_resp_trace_csv, large_window_width, large_window_overlap, window_length, tot_num_samples,
-                             tot_length_seconds, output_name, invert_bool, h, d, pr, pl_min, pl_max, wl, CENSOR_bool, df_censoring, QC_WAVELET_PEAK_bool, QC_PEAK_ONLY_bool, ALL_MEASURES_bool,
+                             tot_length_seconds, output_name, image_output_type, invert_bool, h, d, pr, pl_min, pl_max, wl, CENSOR_bool, df_censoring, QC_WAVELET_PEAK_bool, QC_PEAK_ONLY_bool, ALL_MEASURES_bool,
                              ALL_MEASURES_WINDOW_bool):
     ''' This function takes an input respiration trace (assumed to be multiple minutes long with a 
     sampling rate of 225 samples/s) and computes the instantaneous respiration rate. The window_length argument refers
@@ -280,7 +283,7 @@ def extract_all_resp_metrics(raw_resp_trace_csv, large_window_width, large_windo
         start = 0
         end = samples_per_iteration
         while end < tot_num_samples: 
-            fig, ax = plt.subplots(figsize = (15,5))
+            fig, ax = plt.subplots(figsize = (12,4))
             #plot the respiration trace and the detected breaths to make sure that they were properly detected
             ax.plot(time_array[start:end], resp_trace_smoothed_detrend[start:end]+60, label = 'Smoothed Resp Trace')
             ax.plot(time_array[start:end], breaths_toplot[start:end]+60, '*', label = 'Detected Breath')
@@ -291,7 +294,10 @@ def extract_all_resp_metrics(raw_resp_trace_csv, large_window_width, large_windo
             ax.set_xlabel('Time (s)')
             ax.set_title('Quality Control Breath Extraction')
             ax.legend()
-            fig.savefig(output_name + '_start_' + str(int(time_array[start])) + 's.png')
+            if image_output_type == 'svg':
+                fig.savefig(output_name + '_start_' + str(int(time_array[start])) + 's.svg')
+            else:
+                fig.savefig(output_name + '_start_' + str(int(time_array[start])) + 's.png')
             plt.close()
             start = start + samples_per_iteration
             end = end + samples_per_iteration
@@ -331,7 +337,7 @@ def extract_all_resp_metrics(raw_resp_trace_csv, large_window_width, large_windo
         start = 0
         end = samples_per_iteration
         while end < tot_num_samples: 
-            fig, ax = plt.subplots(figsize = (15,5))
+            fig, ax = plt.subplots(figsize = (12,4))
             #plot the respiration trace and the detected breaths to make sure that they were properly detected
             ax.plot(time_array[start:end], resp_trace_smoothed_detrend[start:end]+60, label = 'Smoothed Resp Trace')
             ax.plot(time_array[start:end], breaths_toplot[start:end]+60, '*', label = 'Detected Breath')
@@ -347,7 +353,10 @@ def extract_all_resp_metrics(raw_resp_trace_csv, large_window_width, large_windo
             ax.set_xlabel('Time (s)')
             ax.set_title('Quality Control Breath Extraction')
             ax.legend()
-            fig.savefig(output_name + '_start_' + str(int(time_array[start])) + 's.png')
+            if image_output_type == 'svg':
+                fig.savefig(output_name + '_start_' + str(int(time_array[start])) + 's.svg')
+            else:
+                fig.savefig(output_name + '_start_' + str(int(time_array[start])) + 's.png')
             plt.close()
             start = start + samples_per_iteration
             end = end + samples_per_iteration
