@@ -29,7 +29,6 @@ from scipy import signal
 from scipy.signal import find_peaks
 import warnings
 import EntropyHub as EH
-import warnings
 
 def repeat_values_for_plotting(data_to_repeat, breaths_bool, breath_indices):
     '''For metrics where there is only 1 value per breath - duplicate the value until the next breath to create array
@@ -62,12 +61,11 @@ def denoise_detrend(raw_trace, sampling_rate, invert_bool):
     
     return trace_smoothed_detrend
 
-def find_breaths(resp_trace_smoothed_detrend, h, d, pr, t, pl_min, pl_max, wl):
+def find_breaths(resp_trace_smoothed_detrend, h, d, pr, pl_min, pl_max, wl):
     '''function to detect breaths throughout entire trace using peak detection algorithm'''
     #find most prominent peaks
-    breath_indices, _ = find_peaks(resp_trace_smoothed_detrend, height = h, distance = d, prominence = pr, threshold = t,
+    breath_indices, properties = find_peaks(resp_trace_smoothed_detrend, height = h, distance = d, prominence = pr,
                                    plateau_size = (pl_min,pl_max), wlen = wl)
-    print(breath_indices)
     
     #create boolean breath array
     breaths_bool = pd.Series(np.repeat(0, len(resp_trace_smoothed_detrend)))
@@ -241,7 +239,7 @@ def get_entropy_in_inst_window(resp_trace_smoothed_detrend, CENSOR_bool, censori
 
 
 def extract_all_resp_metrics(raw_resp_trace_csv, large_window_width, large_window_overlap, window_length, tot_num_samples,
-                             tot_length_seconds, output_name, invert_bool, h, d, pr, t, pl_min, pl_max, wl, CENSOR_bool, df_censoring, QC_WAVELET_PEAK_bool, QC_PEAK_ONLY_bool, ALL_MEASURES_bool,
+                             tot_length_seconds, output_name, invert_bool, h, d, pr, pl_min, pl_max, wl, CENSOR_bool, df_censoring, QC_WAVELET_PEAK_bool, QC_PEAK_ONLY_bool, ALL_MEASURES_bool,
                              ALL_MEASURES_WINDOW_bool):
     ''' This function takes an input respiration trace (assumed to be multiple minutes long with a 
     sampling rate of 225 samples/s) and computes the instantaneous respiration rate. The window_length argument refers
@@ -265,7 +263,7 @@ def extract_all_resp_metrics(raw_resp_trace_csv, large_window_width, large_windo
         #compute wavelet transform
         wavelet = get_wavelet(resp_trace_smoothed_detrend, CENSOR_bool, censoring_arr_full, sampling_rate, time_array,tot_num_samples, output_name)
     #extract the breath indices
-    breath_indices, breaths_bool, breaths_toplot = find_breaths(resp_trace_smoothed_detrend, h, d, pr, t, pl_min, pl_max,wl)
+    breath_indices, breaths_bool, breaths_toplot = find_breaths(resp_trace_smoothed_detrend, h, d, pr, pl_min, pl_max,wl)
     
     if CENSOR_bool:
         #find the location of censored breaths within the breath_indices_window
