@@ -41,11 +41,12 @@ def denoise(pulseox_trace, sampling_rate, invert_bool):
     
     return trace_smoothed
 
-def find_heart_beats(trace_smoothed, height_val, dist_val, prominence_val, plat_max, width_val):
+def find_heart_beats(trace_smoothed, param_df):
     
     #find most prominent peaks - setting a min width prevents detection of a bifurcated peak as two separate peaks
-    beat_indices, beat_properties = find_peaks(trace_smoothed, height = height_val, distance = dist_val,
-                                               prominence = prominence_val, plateau_size = (1,plat_max), width = width_val, rel_height = 1)
+    beat_indices, beat_properties = find_peaks(trace_smoothed, height = param_df['height'], threshold = param_df['threshold'], 
+                                                distance = param_df['distance'], prominence = param_df['prominence'], width = param_df['width'],
+                                                wlen = param_df['wlen'], rel_height = param_df['rel_height'], plateau_size = param_df['plateau_size'])
     
     #create boolean beat array
     beats_bool = pd.Series(np.repeat(0, len(trace_smoothed)))
@@ -150,7 +151,10 @@ def get_wavelet(trace_smoothed, sampling_rate, time_array,tot_num_samples, outpu
     plt.xlabel('Time (s)')
     plt.ylabel('Frequency (breaths/s)')
     plt.colorbar()
-    plt.savefig(output_name +  '_wavelet_transform.png')
+    if image_output_type == 'svg':
+        plt.savefig(output_name +  '_wavelet_transform.svg')
+    else:
+        plt.savefig(output_name +  '_wavelet_transform.png')
     plt.close()
 
     return cwtmatr, cwtmatr_norm_height
@@ -439,39 +443,40 @@ def downsample_to_once_per_sec(series_to_downsample, tot_num_samples, tot_length
         warnings.simplefilter("ignore", category=RuntimeWarning)
         series_downsampled = np.nanmean(series_reshaped, axis=0)
     return pd.Series(series_downsampled)
-    
 
-def extract_all_pulseox_metrics(raw_trace_arr, large_window_width, large_window_overlap, window_length, tot_num_samples,
-                             tot_length_seconds, output_name, h, d, pr, pl_max, width_val, wavelet_band_width, wavelet_peak_dist,
-                               num_bands_to_detect, invert_bool, num_to_avg, CENSOR_bool, df_censoring, QC_WAVELET_PEAK_bool, QC_PEAK_ONLY_bool, ALL_MEASURES_bool,
-                             ALL_MEASURES_WINDOW_bool):
-    ''' This function takes an input pulseox trace (assumed to be multiple minutes long with a 
-    sampling rate of 450 samples/s) and computes the instantaneous respiration rate. The window_length argument refers
-    the window within which the instantaneous window is computed (in seconds).'''
+def extract_all_pulseox_metrics(analysis_type, input_trace, tot_length_seconds, output_name, image_output_type, peak_detection_parameter_csv, invert_bool, window_length,
+                                fMRI_censoring_mask_csv, fMRI_TR, large_window_width, large_window_overlap):
+    '''This function combines all the other functions in order.'''
+    raw_trace_arr = pd.read_csv(input_trace, header = None)[0]
+    tot_num_samples = len(raw_trace_arr)
     sampling_rate = int(tot_num_samples/tot_length_seconds)
+    print(sampling_rate)
     time_array = np.arange(start=0, stop=tot_length_seconds , step=1/sampling_rate)
+    param_df = pd.read_csv(peak_detection_parameter_csv)
     
-    if CENSOR_bool:
+    if fMRI_censoring_mask_csv is not None:
         #the censoring df is generated from the EPI, so it has length tot_length_seconds 
         # multiply it by sampling rate to get array of length tot_num_samples - convert so True represents points that ARE censored
-        censoring_arr_full = np.repeat(np.array(df_censoring), sampling_rate) == False
+        fMRI_censoring_df = pd.read_csv(fMRI_censoring_mask_csv)[0]
+        censoring_arr_full = np.repeat(np.array(fMRI_censoring_df), sampling_rate/fMRI_TR) == False
         indices_of_censored_samples = np.where(censoring_arr_full ==1)[0]
-    
+    else:
+        censoring_arr_full = None
     ######################################### PREPROCESSING #####################################
     #denoise
     trace_smoothed = denoise(raw_trace_arr, sampling_rate, invert_bool)
     del raw_trace_arr
     gc.collect()
-    if QC_PEAK_ONLY_bool == False:
+    if analysis_type == 'wavelet_only':
         wavelet, wavelet_norm = get_wavelet(trace_smoothed, sampling_rate, time_array,tot_num_samples, output_name)
     #extract the heart beat indices
-    beat_indices, beats_bool, beats_toplot, beat_prominence = find_heart_beats(trace_smoothed, h, d, pr, pl_max, width_val)
+    beat_indices, beats_bool, beats_toplot, beat_prominence = find_heart_beats(trace_smoothed, param_df)
     #find the location of censored breaths within the breath_indices_window
     location_of_censored = np.where(np.isin(beat_indices,indices_of_censored_samples))
     #resp rate in rolling window - per sample
     HR_inst, HR_inst_censored = get_HR_inst(beats_bool, CENSOR_bool, censoring_arr_full, window_length, sampling_rate)
 
-    if ALL_MEASURES_bool == False:
+    if analysis_type == 'peak_detection_only':
         ######################################## PLOT PEAKS AND HR FOR QC #############################
         #plot each 20s segment
         samples_per_iteration = int(sampling_rate*20)
@@ -483,13 +488,16 @@ def extract_all_pulseox_metrics(raw_trace_arr, large_window_width, large_window_
             ax.plot(time_array[start:end], 2*trace_smoothed[start:end]+ np.nanmax(HR_inst), label = 'Smoothed Pulseox Trace')
             ax.plot(time_array[start:end], 2*beats_toplot[start:end]+ np.nanmax(HR_inst), '.', label = 'Detected Beat')
             ax.plot(time_array[start:end], HR_inst[start:end], label = 'Heart Rate')
-            if CENSOR_bool:
+            if fMRI_censoring_df is not None:
                 ax.fill_between(time_array[start:end], 0, 1, where=censoring_arr_full[start:end], facecolor='red', alpha=0.2,
                                 transform=ax.get_xaxis_transform())
             ax.set_xlabel('Time (s)')
             ax.set_title('Quality Control Heart Beat Extraction')
             ax.legend()
-            fig.savefig(output_name + '_start_' + str(int(time_array[start])) + 's.png')
+            if image_output_type == 'svg':
+                fig.savefig(output_name + '_start_' + str(int(time_array[start])) + 's.svg')
+            else:
+                fig.savefig(output_name + '_start_' + str(int(time_array[start])) + 's.png')
             plt.close()
             start = start + samples_per_iteration
             end = end + samples_per_iteration
@@ -497,7 +505,7 @@ def extract_all_pulseox_metrics(raw_trace_arr, large_window_width, large_window_
         df_basic = pd.DataFrame({'HR': HR_inst})     
         df_basic.to_csv(output_name + "HR.csv")
     
-    if ALL_MEASURES_bool | ALL_MEASURES_WINDOW_bool:
+    if analysis_type == 'compute_metrics':
         ######################################### EXTRACT INSTANTANEOUS METRICS ######################
         #resp rate in rolling window - per sample
         HR_inst, HR_inst_censored = get_HR_inst(beats_bool, CENSOR_bool, censoring_arr_full, window_length, sampling_rate)
@@ -550,13 +558,16 @@ def extract_all_pulseox_metrics(raw_trace_arr, large_window_width, large_window_
             ax.plot(time_array[start:end], 5*periodicty_percent_above_halfmax[start:end], label = 'Periodicity (% wavelet above HM)(x5)')
             ax.plot(time_array[start:end], 50*wavelet_peak_num[start:end], label = 'Number of wavelet peaks (x50)')
             ax.plot(time_array[start:end], 1000*entropy_inst_full_length[start:end], label = 'Entropy (x1000)')
-            if CENSOR_bool:
+            if fMRI_censoring_mask_csv:
                 ax.fill_between(time_array[start:end], 0, 1, where=censoring_arr_full[start:end], facecolor='red', alpha=0.2,
                                 transform=ax.get_xaxis_transform())
             ax.set_xlabel('Time (s)')
             ax.set_title('Quality Control Heart Beat Extraction')
             ax.legend()
-            fig.savefig(output_name + '_start_' + str(int(time_array[start])) + 's.png')
+            if image_output_type == 'svg':
+                fig.savefig(output_name + '_start_' + str(int(time_array[start])) + 's.svg')
+            else:
+                fig.savefig(output_name + '_start_' + str(int(time_array[start])) + 's.png')
             plt.close()
             start = start + samples_per_iteration
             end = end + samples_per_iteration
@@ -568,7 +579,7 @@ def extract_all_pulseox_metrics(raw_trace_arr, large_window_width, large_window_
       
     
         ######################################### EXTRACT AVERAGE METRICS IN WINDOW ##################
-    if ALL_MEASURES_WINDOW_bool:
+    if analysis_type == 'compute_metrics' & large_window_width is not None:
         #create arrays to store the values for for all windows
         num_windows = 1+int((tot_length_seconds - large_window_width)/large_window_overlap)#numerator gives last start, frac gives num starts
         metrics_in_window = np.zeros((num_windows,21))
@@ -591,11 +602,11 @@ def extract_all_pulseox_metrics(raw_trace_arr, large_window_width, large_window_
             beat_indices_window_nocensor = (beat_indices >= large_window_start_samplenum) & (beat_indices < large_window_end_samplenum)
             #ignore the breaths that are in a censored area
             beat_indices_window = np.copy(beat_indices_window_nocensor)
-            if CENSOR_bool:
+            if fMRI_censoring_df is not None:
                 beat_indices_window[location_of_censored] = False
             
             #extract mean/std of instantaneous HR in that window
-            if CENSOR_bool:
+            if fMRI_censoring_df is not None:
                 metrics_in_window[count,2] = np.nanmean(HR_inst_censored[large_window_start_samplenum:large_window_end_samplenum])
                 metrics_in_window[count,3] = np.nanstd(HR_inst_censored[large_window_start_samplenum:large_window_end_samplenum])
             else:
