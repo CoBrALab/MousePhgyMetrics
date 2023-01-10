@@ -122,7 +122,7 @@ def get_inst_rrv(period_btw_breaths, period_ssd, window_size):
     
     return rrv_std_period, rrv_rmssd_period
 
-def get_wavelet(resp_trace_smoothed_detrend, CENSOR_bool, censoring_arr_full, sampling_rate, time_array,tot_num_samples, output_name):
+def get_wavelet(resp_trace_smoothed_detrend, CENSOR_bool, censoring_arr_full, sampling_rate, time_array,tot_num_samples, output_name, image_output_type):
     '''this function computes the wavelet transform (frequency spectrum at each point in time - very robust to noise) '''
  
     # pad the trace to reduce edge effects
@@ -264,7 +264,7 @@ def extract_all_resp_metrics(raw_resp_trace_csv, large_window_width, large_windo
     resp_trace_smoothed_detrend = denoise_detrend(raw_resp_trace_arr, sampling_rate, invert_bool)
     if QC_PEAK_ONLY_bool == False:
         #compute wavelet transform
-        wavelet = get_wavelet(resp_trace_smoothed_detrend, CENSOR_bool, censoring_arr_full, sampling_rate, time_array,tot_num_samples, output_name)
+        wavelet = get_wavelet(resp_trace_smoothed_detrend, CENSOR_bool, censoring_arr_full, sampling_rate, time_array,tot_num_samples, output_name, image_output_type)
     #extract the breath indices
     breath_indices, breaths_bool, breaths_toplot = find_breaths(resp_trace_smoothed_detrend, h, d, pr, pl_min, pl_max,wl)
     

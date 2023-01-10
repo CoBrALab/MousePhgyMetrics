@@ -23,61 +23,19 @@ Create the environment from the provided environment file:`conda env create --fi
     (run from the folder containing respiration_functions.py and cardiac_functions.py)
     
 # **Functions** 
-Respiration:
 ```
-respiration_functions.extract_all_resp_metrics(raw_resp_trace_arr, large_window_width, large_window_overlap, window_length, tot_num_samples,
-                             tot_length_seconds, output_name, image_output_type, invert_bool, h, d, pr, pl_min, pl_max, wl, 
-                             CENSOR_bool, df_censoring, QC_WAVELET_PEAK_bool, QC_PEAK_ONLY_bool, ALL_MEASURES_bool, 
-                             ALL_MEASURES_WINDOW_bool)
- <raw_resp_trace_arr> : csv containing a single column of the raw respiration trace samples
- --large_window_width: width of window (in seconds) if you wish to compute the average respiration metrics within a window. Otherwise, put None.
- --large_window_overlap: overlap between windows (in seconds). Otherwise, put None.
- --window_length: rolling window length (in seconds) over which to smooth respiration trace. Default is 2.
- --tot_num_samples: the total number of samples of the raw respiration trace.
- --tot_length_seconds: the total duration in seconds of the raw respiration trace.
- --output_name: path and name of the output files
- --image_output_type: 'svg' (for publication-quality) or 'png'
- --invert_bool: whether or not the respiration trace should be inverted (e.g. if the respiration pillow was placed upside down). Either True or False.
- --h: height parameter controls peaks that are detected. Sets minimum peak height. Default 0.25.
- --d: distance parameter controls peaks that are detected. Sets minimmum distance in number of samples between peaks. Default 55.
- --pr: prominence parameter controls peaks that are detected. Sets vertical distance between peak and trough. Default 3.
- --pl_min, pl_max: plateau parameters control peaks that are detected. Set min and max plateau width in number of samples. Defaults are 1, 30.
- --wl: width parameter controls peaks that are detected. Default None.
- --CENSOR_bool: boolean determining whether or not respiration trace should be censored according to the fMRI censoring array.
- --df_censoring: dataframe of the fMRI censoring array produced by RABIES.
- --QC_WAVELET_PEAK_bool: if True, outputs both the wavelet and preliminary peaks for quality control. For use the first time the function is applied.
- --QC_PEAK_ONLY_bool: if True, outputs only the peaks but doesn't recompute wavelet. For efficient tuning of peak detection parameters.
- --ALL_MEASURES_bool: if True, outputs all measures (entropy, RRV, period, periodicity). For use after optimal peak detection parameters have been settled.
- --ALL_MEASURES_WINDOW_bool: if True, computes the average of all measures within the specified time window.
- ```
- Pulse oximetry:
- ```
-cardiac_functions.extract_all_pulseox_metrics(raw_trace_arr, large_window_width, large_window_overlap, window_length, tot_num_samples,
-                             tot_length_seconds, output_name, h, d, pr, pl_max, width_val, wavelet_band_width,
-                             wavelet_peak_dist, num_bands_to_detect, invert_bool, num_to_avg, CENSOR_bool,
-                             df_censoring, QC_WAVELET_PEAK_bool, QC_PEAK_ONLY_bool, ALL_MEASURES_bool, 
-                             ALL_MEASURES_WINDOW_bool)
- <raw_trace_arr> : csv containing a single column of the raw pulse oximetry trace samples
- --large_window_width: width of window (in seconds) if you wish to compute the average metrics within a window. Otherwise, put None.
- --large_window_overlap: overlap between windows (in seconds). Otherwise, put None.
- --window_length: rolling window length (in seconds) over which to smooth trace. Default is 1.
- --tot_num_samples: the total number of samples of the raw trace.
- --tot_length_seconds: the total duration in seconds of the raw trace.
- --output_name: path and name of the output files
- --h: height parameter controls peaks that are detected. Sets minimum peak height. Default None.
- --d: distance parameter controls peaks that are detected. Sets minimmum distance in number of samples between peaks. Default 45.
- --pr: prominence parameter controls peaks that are detected. Sets vertical distance between peak and trough. Default 10.
- --pl_max: plateau parameters control peaks that are detected. Set max plateau width in number of samples. Defaults is 200.
- --width_val: width parameter controls peaks that are detected. Default 50.
- --wavelet_band_width: parameter to control identification of unique frequency bands in the wavelet. Default 0.5 seconds.
- --wavelet_peak_dist: parameter to control identification of unique frequency bands in the wavelet. Default 8. 
- --num_bands_to_detect:parameter to control identification of unique frequency bands in the wavelet. Default 2.  
- --invert_bool: whether or not the trace should be inverted. Default False.
- --num_to_avg: parameter to control identification of unique frequency bands in the wavelet. Default 10 000. 
- --CENSOR_bool: boolean determining whether or not respiration trace should be censored according to the fMRI censoring array.
- --df_censoring: dataframe of the fMRI censoring array produced by RABIES.
- --QC_WAVELET_PEAK_bool: if True, outputs both the wavelet and preliminary peaks for quality control. For use the first time the function is applied.
- --QC_PEAK_ONLY_bool: if True, outputs only the peaks but doesn't recompute wavelet. For efficient tuning of peak detection parameters.
- --ALL_MEASURES_bool: if True, outputs all measures (entropy, RRV, period, periodicity). For use after optimal peak detection parameters have been settled.
- --ALL_MEASURES_WINDOW_bool: if True, computes the average of all measures within the specified time window.
- ```
+Usage: execute_analysis.sh [--output_path <arg>] [--output_image_type <arg>] [--peak_detection_parameter_csv <arg>] [--window_length <arg>] [--fMRI_censoring_mask_csv <arg>] [--fMRI_TR <arg>] [--average_metrics_window_length <arg>] [--average_metrics_window_overlap <arg>] [-h|--help] <data_type> <analysis_type> <input_trace> <tot_length_seconds>
+        <data_type>: Specify either respiration or plethysmography - will determine the processing workflow and metrics extracted
+        <analysis_type>: Specify one of three options: wavelet_only, peak_detection_only, compute_metrics. See README for details.
+        <input_trace>: The raw physiological recording, must be a 1D csv file.
+        <tot_length_seconds>: The exact total duration of the provided physiological recording, in seconds.
+        --output_path: Prefix to the output csvs and image files. Must not already exist. (default: './physiology_analysis_outputs')
+        --output_image_type: Type of image to output, either svg (for publication-level quality) or png (default: 'png')
+        --peak_detection_parameter_csv: Parameters that determine the which peaks in the trace are counted as breaths/heart beats. Refer to the scipy.signal.find_peaks() documentation for the full list of parameters. See README for the default values for each data type. (no default)
+        --window_length: rolling window length (in seconds) over which to smooth respiration trace. (default: '2')
+        --fMRI_censoring_mask_csv: If comparing to censored fMRI data, provide the 1D csv of boolean values for each fMRI timepoint, and the physiological outputs will be censored according to the same csv, so that high motion timepoints are excluded from the analysis. (default: 'None')
+        --fMRI_TR: If providing the fMRI_censoring_mask_csv, specify also the TR with which the fMRI data was acquired, in seconds. (default: '1.0')
+        --average_metrics_window_length: If wish to compute the average of each metric in a time window, choose the window length (e.g 120s). Only executes when analysis_type=compute_metrics (default: 'None')
+        --average_metrics_window_overlap: If wish to compute the average of each metric in a rolling time window, choose the overlap between windows (e.g 60s). Only executes when analysis_type=compute_metrics (default: 'None')
+        -h, --help: Prints help ```
+ 
