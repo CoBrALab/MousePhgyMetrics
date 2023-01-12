@@ -507,7 +507,7 @@ def extract_all_pulseox_metrics(analysis_type, input_trace, tot_length_seconds, 
     if fMRI_censoring_mask_csv is not None:
         #the censoring df is generated from the EPI, so it has length tot_length_seconds 
         # multiply it by sampling rate to get array of length tot_num_samples - convert so True represents points that ARE censored
-        fMRI_censoring_df = pd.read_csv(fMRI_censoring_mask_csv)[0]
+        fMRI_censoring_df = pd.read_csv(fMRI_censoring_mask_csv)
         censoring_arr_full = np.repeat(np.array(fMRI_censoring_df), int(sampling_rate*fMRI_TR)) == False
         indices_of_censored_samples = np.where(censoring_arr_full ==1)[0]
     else:
@@ -558,9 +558,12 @@ def extract_all_pulseox_metrics(analysis_type, input_trace, tot_length_seconds, 
                 start = start + samples_per_iteration
                 end = end + samples_per_iteration
             #save outputs
-            df_basic = pd.DataFrame({'HR': HR_inst})     
-            df_basic.to_csv(output_name + "HR.csv")
-        
+            if fMRI_censoring_mask_csv is not None:
+                df_basic = pd.DataFrame({'HR_censored': HR_inst_censored})     
+                df_basic.to_csv(output_name + "HR_censored.csv")
+            else:
+                df_basic = pd.DataFrame({'HR': HR_inst})     
+                df_basic.to_csv(output_name + "HR.csv")       
         ######################################### COMPUTE METRICS ######################
         if analysis_type == 'compute_metrics':
             #resp rate in rolling window - per sample
