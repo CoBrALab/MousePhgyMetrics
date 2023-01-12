@@ -308,7 +308,7 @@ def extract_all_resp_metrics(analysis_type, input_trace, tot_length_seconds, out
     if fMRI_censoring_mask_csv is not None:
         #the censoring df is generated from the EPI, so it has length tot_length_seconds 
         # multiply it by sampling rate to get array of length tot_num_samples - convert so True represents points that ARE censored
-        fMRI_censoring_df = pd.read_csv(fMRI_censoring_mask_csv)[0]
+        fMRI_censoring_df = pd.read_csv(fMRI_censoring_mask_csv)
         censoring_arr_full = np.repeat(np.array(fMRI_censoring_df), int(sampling_rate*fMRI_TR)) == False
         indices_of_censored_samples = np.where(censoring_arr_full ==1)[0]
     else:
@@ -362,8 +362,12 @@ def extract_all_resp_metrics(analysis_type, input_trace, tot_length_seconds, out
                 start = start + samples_per_iteration
                 end = end + samples_per_iteration
             # save outputs
-            df_basic = pd.DataFrame({'RR': resp_rate_inst})     
-            df_basic.to_csv(output_name + "RR.csv")
+            if fMRI_censoring_mask_csv is not None:
+                df_basic = pd.DataFrame({'RR_censored': resp_rate_inst_censored})     
+                df_basic.to_csv(output_name + "RR_censored.csv")
+            else:
+                df_basic = pd.DataFrame({'RR': resp_rate_inst})     
+                df_basic.to_csv(output_name + "RR.csv")
 
         if analysis_type == 'compute_metrics':
             ######################################### EXTRACT INSTANTANEOUS METRICS ######################
