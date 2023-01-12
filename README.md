@@ -12,7 +12,7 @@ Download from github into the desired folder:
 `git clone https://github.com/CoBrALab/MousePhgyMetrics`
 
 Create the environment from the provided environment file:`conda env create --file environment.yml`
-# **Use**
+# **Use on CIC**
 1. `module load anaconda`
 2. `conda activate phgy_analysis`
 3. `python`
