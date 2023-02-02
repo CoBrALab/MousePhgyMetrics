@@ -16,6 +16,28 @@ import warnings
 import EntropyHub as EH
 import gc
 import ast
+import os
+
+######################################## Take the arguments from bash ##################################
+analysis_type=sys.argv[2]
+input_trace=os.path.abspath(sys.argv[3])
+tot_length_seconds=ast.literal_eval(sys.argv[4])
+output_name=sys.argv[5]
+image_output_type=sys.argv[6]
+peak_detection_parameter_csv=os.path.abspath(sys.argv[7])
+invert_bool=ast.literal_eval(sys.argv[8])
+window_length=ast.literal_eval(sys.argv[9])
+fMRI_censoring_mask_csv=os.path.abspath(sys.argv[10])
+fMRI_TR=ast.literal_eval(sys.argv[11])
+large_window_width=ast.literal_eval(sys.argv[12])
+large_window_overlap=ast.literal_eval(sys.argv[13])
+
+if peak_detection_parameter_csv == 'None':
+    peak_detection_parameter_csv = None
+if fMRI_censoring_mask_csv == 'None':
+    fMRI_censoring_mask_csv = None
+
+######################################## FUNCTIONS #################################
 
 def repeat_values_for_plotting(data_to_repeat, beats_bool, beat_indices):
     '''For metrics where there is only 1 value per breath - duplicate the value until the next breath to create array
@@ -724,7 +746,11 @@ def extract_all_pulseox_metrics(analysis_type, input_trace, tot_length_seconds, 
             df_onesample_per_window.to_csv(output_name + "_per_window.csv")
     else:
         raise Exception('analysis_type is not valid. Please enter one of the three options: wavelet_only, peak_detection_only or compute_metrics.')
-        
-    gc.collect()
+
+###################################################### CALL FUNCTION ##################################
+extract_all_pulseox_metrics(analysis_type, input_trace, tot_length_seconds, output_name, image_output_type,
+                                peak_detection_parameter_csv, invert_bool, window_length,
+                                fMRI_censoring_mask_csv, fMRI_TR, large_window_width, large_window_overlap)
+gc.collect()
     
 
