@@ -6,7 +6,7 @@
 # ARG_POSITIONAL_SINGLE([tot_length_seconds],[The exact total duration of the provided physiological recording, in seconds.],[])
 # ARG_OPTIONAL_SINGLE([output_path],[],[Prefix to the output csvs and image files. Must not already exist.],[./physiology_analysis_outputs])
 # ARG_OPTIONAL_SINGLE([output_image_type],[],[Type of image to output, either svg (for publication-level quality) or png],[png])
-# ARG_OPTIONAL_SINGLE([peak_detection_parameter_csv],[],[Parameters that determine the which peaks in the trace are counted as breaths/heart beats. Refer to the scipy.signal.find_peaks() documentation for the full list of parameters. See README for the default values for each data type.],[])
+# ARG_OPTIONAL_SINGLE([peak_detection_parameter_csv],[],[Parameters that determine the which peaks in the trace are counted as breaths/heart beats. Refer to the scipy.signal.find_peaks() documentation for the full list of parameters. See README for the default values for each data type.],[None])
 # ARG_OPTIONAL_SINGLE([invert_trace_boolean],[],[Whether the raw trace should be inverted (switch peaks and throughs).],[False])
 # ARG_OPTIONAL_SINGLE([window_length],[],[rolling window length (in seconds) over which to smooth respiration trace.],[2])
 # ARG_OPTIONAL_SINGLE([fMRI_censoring_mask_csv],[],[If comparing to censored fMRI data, provide the 1D csv of boolean values for each fMRI timepoint, and the physiological outputs will be censored according to the same csv, so that high motion timepoints are excluded from the analysis.],[None])
@@ -43,7 +43,7 @@ _positionals=()
 # THE DEFAULTS INITIALIZATION - OPTIONALS
 _arg_output_path="./physiology_analysis_outputs"
 _arg_output_image_type="png"
-_arg_peak_detection_parameter_csv=
+_arg_peak_detection_parameter_csv="None"
 _arg_invert_trace_boolean="False"
 _arg_window_length="2"
 _arg_fmri_censoring_mask_csv="None"
@@ -62,7 +62,7 @@ print_help()
 	printf '\t%s\n' "<tot_length_seconds>: The exact total duration of the provided physiological recording, in seconds."
 	printf '\t%s\n' "--output_path: Prefix to the output csvs and image files. Must not already exist. (default: './physiology_analysis_outputs')"
 	printf '\t%s\n' "--output_image_type: Type of image to output, either svg (for publication-level quality) or png (default: 'png')"
-	printf '\t%s\n' "--peak_detection_parameter_csv: Parameters that determine the which peaks in the trace are counted as breaths/heart beats. Refer to the scipy.signal.find_peaks() documentation for the full list of parameters. See README for the default values for each data type. (no default)"
+	printf '\t%s\n' "--peak_detection_parameter_csv: Parameters that determine the which peaks in the trace are counted as breaths/heart beats. Refer to the scipy.signal.find_peaks() documentation for the full list of parameters. See README for the default values for each data type. (default: 'None')"
 	printf '\t%s\n' "--invert_trace_boolean: Whether the raw trace should be inverted (switch peaks and throughs). (default: 'False')"
 	printf '\t%s\n' "--window_length: rolling window length (in seconds) over which to smooth respiration trace. (default: '2')"
 	printf '\t%s\n' "--fMRI_censoring_mask_csv: If comparing to censored fMRI data, provide the 1D csv of boolean values for each fMRI timepoint, and the physiological outputs will be censored according to the same csv, so that high motion timepoints are excluded from the analysis. (default: 'None')"
