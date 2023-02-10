@@ -17,24 +17,25 @@ import EntropyHub as EH
 import gc
 import ast
 import os
+import sys
 
 ######################################## Take the arguments from bash ##################################
-analysis_type=sys.argv[2]
-input_trace=os.path.abspath(sys.argv[3])
-tot_length_seconds=ast.literal_eval(sys.argv[4])
-output_name=sys.argv[5]
-image_output_type=sys.argv[6]
-peak_detection_parameter_csv=os.path.abspath(sys.argv[7])
-invert_bool=ast.literal_eval(sys.argv[8])
-window_length=ast.literal_eval(sys.argv[9])
-fMRI_censoring_mask_csv=os.path.abspath(sys.argv[10])
-fMRI_TR=ast.literal_eval(sys.argv[11])
-large_window_width=ast.literal_eval(sys.argv[12])
-large_window_overlap=ast.literal_eval(sys.argv[13])
+analysis_type=sys.argv[1]
+input_trace=os.path.abspath(sys.argv[2])
+tot_length_seconds=ast.literal_eval(sys.argv[3])
+output_name=os.path.abspath(sys.argv[4])
+image_output_type=sys.argv[5]
+peak_detection_parameter_csv=os.path.abspath(sys.argv[6])
+invert_bool=ast.literal_eval(sys.argv[7])
+window_length=ast.literal_eval(sys.argv[8])
+fMRI_censoring_mask_csv=os.path.abspath(sys.argv[9])
+fMRI_TR=ast.literal_eval(sys.argv[10])
+large_window_width=ast.literal_eval(sys.argv[11])
+large_window_overlap=ast.literal_eval(sys.argv[12])
 
-if peak_detection_parameter_csv == 'None':
+if 'None' in peak_detection_parameter_csv:
     peak_detection_parameter_csv = None
-if fMRI_censoring_mask_csv == 'None':
+if 'None' in fMRI_censoring_mask_csv:
     fMRI_censoring_mask_csv = None
 
 ######################################## FUNCTIONS #################################

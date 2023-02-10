@@ -12,17 +12,10 @@ Download from github into the desired folder:
 `git clone https://github.com/CoBrALab/MousePhgyMetrics`
 
 Create the environment from the provided environment file:`conda env create --file environment.yml`
-# **Use on CIC**
-1. `module load anaconda`
-2. `conda activate phgy_analysis`
-3. `python`
-3. ``` 
-    import respiration_functions
-    import cardiac_functions
-    ```
-    (run from the folder containing respiration_functions.py and cardiac_functions.py)
-    
-# **Functions** 
+
+# **Usage** 
+
+## Complete Command line interface
 ```
 Usage: execute_analysis.sh [--output_path <arg>] [--output_image_type <arg>] [--peak_detection_parameter_csv <arg>] [--window_length <arg>] [--fMRI_censoring_mask_csv <arg>] [--fMRI_TR <arg>] [--average_metrics_window_length <arg>] [--average_metrics_window_overlap <arg>] [-h|--help] <data_type> <analysis_type> <input_trace> <tot_length_seconds>
         <data_type>: Specify either respiration or plethysmography - will determine the processing workflow and metrics extracted
@@ -39,3 +32,11 @@ Usage: execute_analysis.sh [--output_path <arg>] [--output_image_type <arg>] [--
         --average_metrics_window_overlap: If wish to compute the average of each metric in a rolling time window, choose the overlap between windows (e.g 60s). Only executes when analysis_type=compute_metrics (default: 'None')
         -h, --help: Prints help ```
  
+ ## Step 1: Obtain wavelet transform
+ The wavelet transform is a data-driven approach to obtain the spectral (frequency) properties of the input trace. It provides an estimate of the power across frequencies at each timepoint and is robust to noise. Thus, by examining at the wavelet transform of the respiration trace, you will be able to see the instantaneous respiration rate for each sample. By examining the wavelet transform of the plethysmography trace, you will see frequency bands for both the respiration rate and heart rate. This is convenient for getting a quick overview of your data and for performing quality control of later calculations that rely on detecting peaks in the data. NOTE: the wavelet transform is not typically used to extract values of respiration/heart rate and cannot provide other measures such as PVI.
+
+ # Example
+```
+module load anaconda
+conda activate phgy_analysis
+bash execute_analysis.sh respiration wavelet_only /data/scratch2/uromil/2021_fmri_dev/part2_phgy_fmri_project/2_raw_data/phgy_data/dx1_001resp_CLEANEDforTEST.txt 1440 ```
