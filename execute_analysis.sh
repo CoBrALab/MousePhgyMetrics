@@ -205,16 +205,7 @@ assign_positional_args 1 "${_positionals[@]}"
 set -euo pipefail
 IFS=$'\n\t'
 
-# Manage output arguments
-output_fname=$(basename -- "$_arg_output_path")
-output_dirname=$(dirname -- "$_arg_output_path")
-output_extension="${output_fname##*.}"
-output_fname_prefix="${output_fname%.*}"
-
-output_path_prefix="$output_dirname/$output_fname_prefix"
-if [ -f "$output_path_prefix.pdf" ] || [ -f "$output_path_prefix.csv" ]; then
-    die "Requested output already exists, aborting not to overwrite." 1
-fi
+mkdir -p $_arg_output_path
 
 #get the path to the folder where the current script is located
 wdir="$PWD"; [ "$PWD" = "/" ] && wdir=""

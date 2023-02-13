@@ -112,7 +112,11 @@ def get_HR_inst(beats, censoring_arr_full, window_length, sampling_rate):
     if censoring_arr_full is not None:
         #censor the necessary samples by setting them to nan
         HR_smooth_censored = np.copy(HR_smooth)
-        HR_smooth_censored[censoring_arr_full] = np.nan
+        try:
+            HR_smooth_censored[censoring_arr_full] = np.nan
+        except:
+            print("The duration of the plethysmography trace does not match the duration of the fMRI censoring csv. Check the number of samples in both csvs as well as the specified fMRI_TR and tot_length_seconds options.")
+
     else:
         HR_smooth_censored = None
         
@@ -192,9 +196,9 @@ def get_wavelet(trace_smoothed, sampling_rate, time_array, tot_num_samples, outp
     plt.ylabel('Frequency (bpm)')
     plt.colorbar()
     if image_output_type == 'svg':
-        plt.savefig(output_name +  '_wavelet_transform.svg')
+        plt.savefig(output_name +  '/pleth_wavelet_transform.svg')
     else:
-        plt.savefig(output_name +  '_wavelet_transform.png')
+        plt.savefig(output_name +  '/pleth_wavelet_transform.png')
     plt.close()
 
     return cwtmatr, cwtmatr_norm_height
@@ -574,19 +578,19 @@ def extract_all_pulseox_metrics(analysis_type, input_trace, tot_length_seconds, 
                 ax.set_title('Quality Control Heart Beat Detection')
                 ax.legend(ncol=3)
                 if image_output_type == 'svg':
-                    fig.savefig(output_name + '_start_' + str(int(time_array[start])) + 's.svg')
+                    fig.savefig(output_name + '/QC_pleth-start_' + str(int(time_array[start])) + 's.svg')
                 else:
-                    fig.savefig(output_name + '_start_' + str(int(time_array[start])) + 's.png')
+                    fig.savefig(output_name + '/QC_pleth-start_' + str(int(time_array[start])) + 's.png')
                 plt.close()
                 start = start + samples_per_iteration
                 end = end + samples_per_iteration
             #save outputs
             if fMRI_censoring_mask_csv is not None:
                 df_basic = pd.DataFrame({'HR_censored': HR_inst_censored})     
-                df_basic.to_csv(output_name + "HR_censored.csv")
+                df_basic.to_csv(output_name + "/HR_censored.csv")
             else:
                 df_basic = pd.DataFrame({'HR': HR_inst})     
-                df_basic.to_csv(output_name + "HR.csv")       
+                df_basic.to_csv(output_name + "/HR.csv")       
         ######################################### COMPUTE METRICS ######################
         if analysis_type == 'compute_metrics':
             #resp rate in rolling window - per sample
@@ -647,9 +651,9 @@ def extract_all_pulseox_metrics(analysis_type, input_trace, tot_length_seconds, 
                 ax.set_title('Quality Control Heart Beat Extraction')
                 ax.legend()
                 if image_output_type == 'svg':
-                    fig.savefig(output_name + '_start_' + str(int(time_array[start])) + 's.svg')
+                    fig.savefig(output_name + '/QC_pleth-start_' + str(int(time_array[start])) + 's.svg')
                 else:
-                    fig.savefig(output_name + '_start_' + str(int(time_array[start])) + 's.png')
+                    fig.savefig(output_name + 'QC_pleth-start_' + str(int(time_array[start])) + 's.png')
                 plt.close()
                 start = start + samples_per_iteration
                 end = end + samples_per_iteration
@@ -657,7 +661,7 @@ def extract_all_pulseox_metrics(analysis_type, input_trace, tot_length_seconds, 
             ################## SAVE OUTPUTS ################3
             df_persample = pd.DataFrame({'Pulseox_trace_smoothed': trace_smoothed, 'Beats': beats_toplot, 'HR': HR_inst, 'Period': period_btw_beats_toplot, 
                                         'HRV_std': hrv_inst_std_period_toplot, 'HRV_rmssd': hrv_inst_rmssd_period_toplot, 'PVI': pvi_inst_toplot, 'Periodicity': periodicty_percent_above_halfmax, 'Entropy': entropy_inst_full_length})     
-            df_persample.to_csv(output_name + "_per_sample.csv")
+            df_persample.to_csv(output_name + "/pleth_metrics_per_sample.csv")
 
 
             ######################################### EXTRACT AVERAGE METRICS IN WINDOW ##################
@@ -744,7 +748,7 @@ def extract_all_pulseox_metrics(analysis_type, input_trace, tot_length_seconds, 
                 df_onesample_per_window.insert(9, 'Instantaneous veryhighfreq HR from wavelet-window mean', HR_vhigh_in_window[:, 0])
                 df_onesample_per_window.insert(12, 'Instantaneous veryhighfreq peak height-window mean', HR_vhigh_in_window[:, 1])
 
-            df_onesample_per_window.to_csv(output_name + "_per_window.csv")
+            df_onesample_per_window.to_csv(output_name + "/pleth_metrics_per_window.csv")
     else:
         raise Exception('analysis_type is not valid. Please enter one of the three options: wavelet_only, peak_detection_only or compute_metrics.')
 

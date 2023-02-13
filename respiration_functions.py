@@ -136,7 +136,10 @@ def get_resp_rate_inst(breaths, censoring_arr_full, window_length, sampling_rate
     if censoring_arr_full is not None:
         #censor the necessary samples by setting them to nan
         resp_rate_smooth_censored = np.copy(resp_rate_smooth)
-        resp_rate_smooth_censored[censoring_arr_full] = np.nan
+        try:
+            resp_rate_smooth_censored[censoring_arr_full] = np.nan
+        except:
+            print("The duration of the respiration trace does not match the duration of the fMRI censoring csv. Check the number of samples in both csvs as well as the specified fMRI_TR and tot_length_seconds options.")
     else:
         resp_rate_smooth_censored = None
         
@@ -189,9 +192,9 @@ def get_wavelet(resp_trace_smoothed_detrend, sampling_rate, time_array,tot_num_s
     plt.ylabel('Frequency (bpm)')
     plt.colorbar()
     if image_output_type == 'svg':
-        plt.savefig(output_name +  '_wavelet_transform.svg')
+        plt.savefig(output_name +  '/respiration_wavelet_transform.svg')
     else:
-        plt.savefig(output_name +  '_wavelet_transform.png')
+        plt.savefig(output_name +  '/respiration_wavelet_transform.png')
     
     return cwtmatr
 
@@ -378,22 +381,22 @@ def extract_all_resp_metrics(analysis_type, input_trace, tot_length_seconds, out
                 ax.set_title('Quality Control Breath Detection')
                 ax.legend(ncol = 3)
                 if image_output_type == 'svg':
-                    fig.savefig(output_name + '_start_' + str(int(time_array[start])) + 's.svg')
+                    fig.savefig(output_name + '/QC_resp-start_' + str(int(time_array[start])) + 's.svg')
                 else:
-                    fig.savefig(output_name + '_start_' + str(int(time_array[start])) + 's.png')
+                    fig.savefig(output_name + '/QC_resp-start_' + str(int(time_array[start])) + 's.png')
                 plt.close()
                 start = start + samples_per_iteration
                 end = end + samples_per_iteration
             # save outputs
             if fMRI_censoring_mask_csv is not None:
                 df_basic = pd.DataFrame({'RR_censored': resp_rate_inst_censored})     
-                df_basic.to_csv(output_name + "RR_censored.csv")
+                df_basic.to_csv(output_name + "/RR_censored.csv")
             else:
                 df_basic = pd.DataFrame({'RR': resp_rate_inst})     
-                df_basic.to_csv(output_name + "RR.csv")
+                df_basic.to_csv(output_name + "/RR.csv")
 
         if analysis_type == 'compute_metrics':
-            ######################################### EXTRACT INSTANTANEOUS METRICS ######################
+            ######################################### COMPUTE METRICS ######################
             #resp rate in rolling window - per sample
             resp_rate_inst, resp_rate_inst_censored = get_resp_rate_inst(breaths_bool, CENSOR_bool, censoring_arr_full, window_length, sampling_rate)
 
@@ -440,9 +443,9 @@ def extract_all_resp_metrics(analysis_type, input_trace, tot_length_seconds, out
                 ax.set_title('Quality Control Breath Extraction')
                 ax.legend()
                 if image_output_type == 'svg':
-                    fig.savefig(output_name + '_start_' + str(int(time_array[start])) + 's.svg')
+                    fig.savefig(output_name + '/QC_resp-start_' + str(int(time_array[start])) + 's.svg')
                 else:
-                    fig.savefig(output_name + '_start_' + str(int(time_array[start])) + 's.png')
+                    fig.savefig(output_name + '/QC_resp-start_' + str(int(time_array[start])) + 's.png')
                 plt.close()
                 start = start + samples_per_iteration
                 end = end + samples_per_iteration
@@ -450,7 +453,7 @@ def extract_all_resp_metrics(analysis_type, input_trace, tot_length_seconds, out
             ################## SAVE OUTPUTS ################3
             df_persample = pd.DataFrame({'Resp_trace_smoothed': resp_trace_smoothed_detrend, 'Breaths': breaths_toplot, 'RR': resp_rate_inst, 'Period': period_btw_breaths_toplot, 
                                         'RRV_std': rrv_inst_std_period_toplot, 'RRV_rmssd': rrv_inst_rmssd_period_toplot, 'Periodicity': periodicty_percent_above_halfmax, 'Entropy': entropy_inst_full_length})     
-            df_persample.to_csv(output_name + "_per_sample.csv")
+            df_persample.to_csv(output_name + "/resp_metrics_per_sample.csv")
 
     ######################################### EXTRACT AVERAGE METRICS IN WINDOW ##################
         if (analysis_type == 'compute_metrics') & (large_window_width is not None):
@@ -522,7 +525,7 @@ def extract_all_resp_metrics(analysis_type, input_trace, tot_length_seconds, out
 
             ######################################## SAVE OUTPUTS ######################################
             df_onesample_per_window = pd.DataFrame(metrics_in_window, columns = ['Window start time','Window end time','Instantaneous resp rate-window mean', 'Instantaneous resp rate - window std', 'Instantaneous RRV period std-window mean','Instantanous RRV period rmssd-window mean', 'Instantaneous periodicity-window mean', 'Instantaneous entropy-window mean','Resp rate-overall window','Period-overall window mean', 'RRV-overall period window std', 'RRV-overall period window rmssd', 'Entropy-overall window'])     
-            df_onesample_per_window.to_csv(output_name + "_per_window.csv")
+            df_onesample_per_window.to_csv(output_name + "/resp_metrics_per_window.csv")
     else:
         raise Exception('analysis_type is not valid. Please enter one of the three options: wavelet_only, peak_detection_only or compute_metrics.')
 
