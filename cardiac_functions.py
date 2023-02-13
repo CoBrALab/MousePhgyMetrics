@@ -233,7 +233,7 @@ def get_entropy(trace_smoothed, entropy_type, m_val, censoring_arr_full):
         
     return desired_entropy
 
-def get_entropy_in_inst_window(trace_smoothed, CENSOR_bool, censoring_arr_full, window_size_seconds, sampling_rate, tot_num_samples):
+def get_entropy_in_inst_window(trace_smoothed, censoring_arr_full, window_size_seconds, sampling_rate, tot_num_samples):
     '''this function repeats the get_entropy() function in a for loop of a few seconds - extract instantaneous metric of entropy in this 
     short window'''
     #define window size
@@ -249,10 +249,16 @@ def get_entropy_in_inst_window(trace_smoothed, CENSOR_bool, censoring_arr_full, 
         
         #define window end
         short_window_end_sample = short_window_start_sample + short_window_width
+
+                #if there is a censoring array, extract portion within the window
+        if censoring_arr_full is not None:
+            censoring_arr_window = censoring_arr_full[short_window_start_sample:short_window_end_sample]
+        else:
+            censoring_arr_window = None
         
         #extract entropy in that window
-        entropy_inst[count]= get_entropy(trace_smoothed[short_window_start_sample:short_window_end_sample],'Sample',6, CENSOR_bool,
-                                        censoring_arr_full[short_window_start_sample:short_window_end_sample])
+        entropy_inst[count]= get_entropy(trace_smoothed[short_window_start_sample:short_window_end_sample],'Sample',6,
+                                        censoring_arr_window)
         
         #set next window
         short_window_start_sample = short_window_end_sample
@@ -412,8 +418,13 @@ def extract_all_pulseox_metrics(analysis_type, input_trace, tot_length_seconds, 
 
             ######################################### EXTRACT AVERAGE METRICS IN WINDOW ##################
         if (analysis_type == 'compute_metrics') & (large_window_width is not None):
-            #create arrays to store the values for for all windows
-            num_windows = 1+int((tot_length_seconds - large_window_width)/large_window_overlap)#numerator gives last start, frac gives num starts
+            #if no overlap is provided, set it to 0
+            if large_window_overlap is None:
+                large_window_overlap = 0
+                #create arrays to store the values for for all windows
+                num_windows = int(tot_length_seconds/large_window_width) 
+            else:
+                num_windows = 1+int((tot_length_seconds - large_window_width)/large_window_overlap) #numerator gives last start, frac gives num starts
             metrics_in_window = np.zeros((num_windows,15))
 
             #extract a time window
