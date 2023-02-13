@@ -17,24 +17,25 @@ import EntropyHub as EH
 import gc
 import ast
 import os
+import sys
 
 ######################################## Take the arguments from bash ##################################
-analysis_type=sys.argv[2]
-input_trace=os.path.abspath(sys.argv[3])
-tot_length_seconds=ast.literal_eval(sys.argv[4])
-output_name=sys.argv[5]
-image_output_type=sys.argv[6]
-peak_detection_parameter_csv=os.path.abspath(sys.argv[7])
-invert_bool=ast.literal_eval(sys.argv[8])
-window_length=ast.literal_eval(sys.argv[9])
-fMRI_censoring_mask_csv=os.path.abspath(sys.argv[10])
-fMRI_TR=ast.literal_eval(sys.argv[11])
-large_window_width=ast.literal_eval(sys.argv[12])
-large_window_overlap=ast.literal_eval(sys.argv[13])
+analysis_type=sys.argv[1]
+input_trace=os.path.abspath(sys.argv[2])
+tot_length_seconds=ast.literal_eval(sys.argv[3])
+output_name=os.path.abspath(sys.argv[4])
+image_output_type=sys.argv[5]
+peak_detection_parameter_csv=os.path.abspath(sys.argv[6])
+invert_bool=ast.literal_eval(sys.argv[7])
+window_length=ast.literal_eval(sys.argv[8])
+fMRI_censoring_mask_csv=os.path.abspath(sys.argv[9])
+fMRI_TR=ast.literal_eval(sys.argv[10])
+large_window_width=ast.literal_eval(sys.argv[11])
+large_window_overlap=ast.literal_eval(sys.argv[12])
 
-if peak_detection_parameter_csv == 'None':
+if 'None' in peak_detection_parameter_csv:
     peak_detection_parameter_csv = None
-if fMRI_censoring_mask_csv == 'None':
+if 'None' in fMRI_censoring_mask_csv:
     fMRI_censoring_mask_csv = None
 
 ######################################## FUNCTIONS #################################
@@ -111,7 +112,11 @@ def get_HR_inst(beats, censoring_arr_full, window_length, sampling_rate):
     if censoring_arr_full is not None:
         #censor the necessary samples by setting them to nan
         HR_smooth_censored = np.copy(HR_smooth)
-        HR_smooth_censored[censoring_arr_full] = np.nan
+        try:
+            HR_smooth_censored[censoring_arr_full] = np.nan
+        except:
+            print("The duration of the plethysmography trace does not match the duration of the fMRI censoring csv. Check the number of samples in both csvs as well as the specified fMRI_TR and tot_length_seconds options.")
+
     else:
         HR_smooth_censored = None
         
@@ -191,234 +196,18 @@ def get_wavelet(trace_smoothed, sampling_rate, time_array, tot_num_samples, outp
     plt.ylabel('Frequency (bpm)')
     plt.colorbar()
     if image_output_type == 'svg':
-        plt.savefig(output_name +  '_wavelet_transform.svg')
+        plt.savefig(output_name +  '/pleth_wavelet_transform.svg')
     else:
-        plt.savefig(output_name +  '_wavelet_transform.png')
+        plt.savefig(output_name +  '/pleth_wavelet_transform.png')
     plt.close()
 
     return cwtmatr, cwtmatr_norm_height
 
-def get_periodiocity_wavelet(trace_smoothed, CENSOR_bool, censoring_arr_full, sampling_rate, time_array,tot_num_samples, output_name, 
-                             wavelet_band_width, wavelet_peak_dist, num_bands_to_detect, num_to_avg, cwtmatr, cwtmatr_norm_height):
-    '''this function computes properties of wavelet transform'''
-
-    #calculate the % that are located above the half max (gives approx measure of spread) and the num of distinct peaks
-    periodicity_percent_spectrum_above_halfmax = pd.Series(np.repeat(np.nan, tot_num_samples))
-    wavelet_peak_num = pd.Series(np.repeat(np.nan, tot_num_samples))
-    wavelet_lowfreq_band = pd.Series(np.repeat(np.nan, tot_num_samples))
-    wavelet_highfreq_band = pd.Series(np.repeat(np.nan, tot_num_samples))
-    wavelet_vhighfreq_band = pd.Series(np.repeat(np.nan, tot_num_samples))
-    wavelet_vhighfreq_band_height = pd.Series(np.repeat(np.nan, tot_num_samples))
-    wavelet_highfreq_band_height = pd.Series(np.repeat(np.nan, tot_num_samples))
-    wavelet_lowfreq_band_height = pd.Series(np.repeat(np.nan, tot_num_samples))
-    halfmax = np.max(np.abs(cwtmatr), axis = 0)/2
-    for col in range(0,tot_num_samples):
-        indices_above_halfmax = np.where(cwtmatr[:,col] >= halfmax[col])[0]
-        periodicity_percent_spectrum_above_halfmax[col] = 100*len(indices_above_halfmax)/50 #50 points per spectrum
-        #smoothed_spectrum_cross_sec = pd.Series(cwtmatr_norm_height[:,col]).rolling(4, min_periods=0, center=True).mean()
-        
-        #get the number of distinct peaks (frequencies)
-        peak_indices, peak_properties = find_peaks(cwtmatr_norm_height[:,col], height = 0.3, plateau_size = (1,5), distance = 
-                                                   wavelet_peak_dist,prominence = 0)
-        wavelet_peak_num[col] = len(peak_indices)
-        sorted_heights = sorted(peak_properties['peak_heights'])[::-1]
-        
-        #if there is only one strong frequency
-        try:
-            pos_of_strongest_peak = np.where(np.array(peak_properties['peak_heights']) == sorted_heights[0])[0][0]
-            freq_of_strongest_peak = freq[0:50][peak_indices[pos_of_strongest_peak]]
-            #detect how similar the new freq peak is to prev frequencies in low/high frequency bands to place it in appropriate band
-            if col == 0:
-                wavelet_lowfreq_band[col] = freq_of_strongest_peak
-                wavelet_lowfreq_band_height[col] = cwtmatr_norm_height[:,col][peak_indices[pos_of_strongest_peak]]
-                wavelet_highfreq_band[col] = np.nan
-            elif (prev_lowfreq + wavelet_band_width > freq_of_strongest_peak) and (prev_lowfreq - wavelet_band_width < freq_of_strongest_peak):
-                wavelet_lowfreq_band[col] = freq_of_strongest_peak
-                wavelet_lowfreq_band_height[col] = cwtmatr_norm_height[:,col][peak_indices[pos_of_strongest_peak]]
-                wavelet_highfreq_band[col] = np.nan
-            elif (prev_highfreq + wavelet_band_width > freq_of_strongest_peak) and (prev_highfreq - wavelet_band_width < freq_of_strongest_peak):
-                wavelet_highfreq_band[col] = freq_of_strongest_peak
-                wavelet_highfreq_band_height[col] = cwtmatr_norm_height[:,col][peak_indices[pos_of_strongest_peak]]
-                wavelet_lowfreq_band[col] = np.nan
-            elif (prev_vhighfreq + wavelet_band_width > freq_of_strongest_peak) and (prev_vhighfreq - wavelet_band_width < freq_of_strongest_peak):
-                wavelet_vhighfreq_band[col] = freq_of_strongest_peak
-                wavelet_vhighfreq_band_height[col] = cwtmatr_norm_height[:,col][peak_indices[pos_of_strongest_peak]]
-            else:
-                #print('Strongest freq cannot be classified, sample: ' + str(col) + '. It is ' + str(freq_of_strongest_peak) + ' - whereas prev low is ' + str(prev_lowfreq) + ' and prev high is ' + str (prev_highfreq))
-                wavelet_lowfreq_band[col] = np.nan
-                wavelet_highfreq_band[col] = np.nan
-        except IndexError as error:
-                wavelet_lowfreq_band[col] = np.nan
-                wavelet_highfreq_band[col] = np.nan
-        #if there is also a second strong frequency
-        try:
-            pos_of_secondary_peak = np.where(np.array(peak_properties['peak_heights']) == sorted_heights[1])[0][0]
-            freq_of_secondary_peak = freq[0:50][peak_indices[pos_of_secondary_peak]]
-            
-            if col == 0:
-                if freq_of_secondary_peak > freq_of_strongest_peak:
-                    #if the second freq is higher than the first one
-                    wavelet_lowfreq_band[col] = freq_of_strongest_peak
-                    wavelet_highfreq_band[col] = freq_of_secondary_peak
-                    wavelet_lowfreq_band_height[col] = cwtmatr_norm_height[:,col][peak_indices[pos_of_strongest_peak]]
-                    wavelet_highfreq_band_height[col] = cwtmatr_norm_height[:,col][peak_indices[pos_of_secondary_peak]]
-                else:
-                    wavelet_highfreq_band[col] = freq_of_strongest_peak
-                    wavelet_lowfreq_band[col] = freq_of_secondary_peak
-                    wavelet_lowfreq_band_height[col] = cwtmatr_norm_height[:,col][peak_indices[pos_of_secondary_peak]]
-                    wavelet_highfreq_band_height[col] = cwtmatr_norm_height[:,col][peak_indices[pos_of_strongest_peak]]
-                
-            elif np.isnan(prev_highfreq):
-                if freq_of_secondary_peak > freq_of_strongest_peak:
-                    wavelet_lowfreq_band[col] = freq_of_strongest_peak
-                    wavelet_highfreq_band[col] = freq_of_secondary_peak
-                    wavelet_lowfreq_band_height[col] = cwtmatr_norm_height[:,col][peak_indices[pos_of_strongest_peak]]
-                    wavelet_highfreq_band_height[col] = cwtmatr_norm_height[:,col][peak_indices[pos_of_secondary_peak]]
-                else:
-                    tmp_oldhigh = np.copy(wavelet_highfreq_band)
-                    tmp_oldlow = np.copy(wavelet_lowfreq_band)
-                    wavelet_highfreq_band = tmp_oldlow
-                    wavelet_lowfreq_band = tmp_oldhigh
-                    wavelet_lowfreq_band[col] = freq_of_secondary_peak
-                    
-                    tmp_oldhigh_height = np.copy(wavelet_highfreq_band_height)
-                    tmp_oldlow_height = np.copy(wavelet_lowfreq_band_height)
-                    wavelet_highfreq_band_height = tmp_oldlow_height
-                    wavelet_lowfreq_band_height = tmp_oldhigh_height
-                    print('SWITCH LOW AND HIGH')
-                
-            elif (freq_of_strongest_peak + wavelet_band_width > freq_of_secondary_peak) and (freq_of_strongest_peak - wavelet_band_width < freq_of_secondary_peak):
-                print('Cannot distinguish well between strong and secondary frequencies, sample: ' + str(col))
-            elif (prev_lowfreq + wavelet_band_width > freq_of_secondary_peak) and (prev_lowfreq - wavelet_band_width < freq_of_secondary_peak):
-                wavelet_lowfreq_band[col] = freq_of_secondary_peak
-                wavelet_lowfreq_band_height[col] = cwtmatr_norm_height[:,col][peak_indices[pos_of_secondary_peak]]
-            elif (prev_highfreq + wavelet_band_width > freq_of_secondary_peak) and (prev_highfreq - wavelet_band_width < freq_of_secondary_peak):
-                wavelet_highfreq_band[col] = freq_of_secondary_peak
-                wavelet_highfreq_band_height[col] = cwtmatr_norm_height[:,col][peak_indices[pos_of_secondary_peak]]
-            elif (prev_vhighfreq + wavelet_band_width > freq_of_secondary_peak) and (prev_vhighfreq - wavelet_band_width < freq_of_secondary_peak):
-                wavelet_vhighfreq_band[col] = freq_of_secondary_peak
-                wavelet_vhighfreq_band_height[col] = cwtmatr_norm_height[:,col][peak_indices[pos_of_secondary_peak]]
-            else:
-                #print('Secondary freq cannot be classified, sample: ' + str(col) + '. It is ' + str(freq_of_secondary_peak) + ' - whereas prev low is ' + str(prev_lowfreq) + ' and prev high is ' + str (prev_highfreq))
-                tmp=0
-        except IndexError as error:
-            #only set previous value to nan if there have not yet been any values in this frequency band
-            if col==0 or np.isnan(prev_highfreq):
-                prev_highfreq = np.nan
-                
-        #if I know that I also want to look for a third frequency
-        if num_bands_to_detect==3:
-            try:
-                pos_of_third_peak = np.where(np.array(peak_properties['peak_heights']) == sorted_heights[2])[0][0]
-                freq_of_third_peak = freq[0:50][peak_indices[pos_of_third_peak]]
-
-                if (col == 0) or np.isnan(prev_vhighfreq):
-                    #assign the newfound third frequency to the right frequence band
-                    #if the third freq is the highest
-                    if (freq_of_third_peak > freq_of_strongest_peak) and (freq_of_third_peak > freq_of_secondary_peak):
-                        wavelet_vhighfreq_band[col] = freq_of_third_peak
-                        wavelet_vhighfreq_band_height[col] = cwtmatr_norm_height[:,col][peak_indices[pos_of_third_peak]]
-                    elif (freq_of_third_peak < freq_of_strongest_peak) and (freq_of_third_peak < freq_of_secondary_peak):
-                       #if the third freq is the lowest, move the other two up
-                        wavelet_vhighfreq_band = np.copy(wavelet_highfreq_band)
-                        wavelet_highfreq_band = np.copy(wavelet_lowfreq_band)
-                        wavelet_lowfreq_band[0:col] = pd.Series(np.repeat(np.nan, col))
-                        wavelet_lowfreq_band[col] = freq_of_third_peak
-                        
-                        wavelet_vhighfreq_band_height = np.copy(wavelet_highfreq_band_height)
-                        wavelet_highfreq_band_height = np.copy(wavelet_lowfreq_band_height)
-                        wavelet_lowfreq_band_height[0:col] = pd.Series(np.repeat(np.nan, col))
-                        wavelet_lowfreq_band_height[col] = cwtmatr_norm_height[:,col][peak_indices[pos_of_third_peak]]
-                        
-                        prev_vhighfreq = np.copy(prev_highfreq)
-                        prev_highfreq = np.copy(prev_lowfreq)
-                        prev_lowfreq = np.nan
-                        print('INSERT THIRD FREQ AS LOW, SHIFT UP OTHER TWO FREQ')
-                    else:
-                        #if the third freq is in the middle: set vhigh to old high, and the high is the newfound third freq
-                        wavelet_vhighfreq_band = np.copy(wavelet_highfreq_band)
-                        wavelet_highfreq_band[0:col] = pd.Series(np.repeat(np.nan, col))
-                        wavelet_highfreq_band[col] = freq_of_third_peak
-                        
-                        wavelet_vhighfreq_band_height = np.copy(wavelet_highfreq_band_height)
-                        wavelet_highfreq_band_height[0:col] = pd.Series(np.repeat(np.nan, col))
-                        wavelet_highfreq_band_height[col] = cwtmatr_norm_height[:,col][peak_indices[pos_of_third_peak]]
-                        
-                        prev_vhighfreq = np.copy(prev_highfreq)
-                        prev_highfreq = np.nan
-                        print('INSERT THIRD FREQ IN MIDDLE, SHIFT UP HIGH TO VERY HIGH')
-
-
-                elif (freq_of_strongest_peak + wavelet_band_width > freq_of_third_peak) and (freq_of_strongest_peak - wavelet_band_width < freq_of_third_peak):
-                    print('Cannot distinguish well between strong and third frequencies, sample: ' + str(col))
-                elif (freq_of_secondary_peak + wavelet_band_width > freq_of_third_peak) and (freq_of_secondary_peak - wavelet_band_width < freq_of_third_peak):
-                    print('Cannot distinguish well between secondary and third frequencies, sample: ' + str(col))
-                elif (prev_vhighfreq + wavelet_band_width > freq_of_third_peak) and (prev_vhighfreq - wavelet_band_width < freq_of_third_peak):
-                    wavelet_vhighfreq_band[col] = freq_of_third_peak
-                    wavelet_vhighfreq_band_height[col] = cwtmatr_norm_height[:,col][peak_indices[pos_of_third_peak]]
-                elif (prev_lowfreq + wavelet_band_width > freq_of_third_peak) and (prev_lowfreq - wavelet_band_width < freq_of_third_peak):
-                    wavelet_lowfreq_band[col] = freq_of_third_peak
-                    wavelet_lowfreq_band_height[col] = cwtmatr_norm_height[:,col][peak_indices[pos_of_third_peak]]
-                elif (prev_highfreq + wavelet_band_width > freq_of_third_peak) and (prev_highfreq - wavelet_band_width < freq_of_third_peak):
-                    wavelet_highfreq_band[col] = freq_of_third_peak
-                    wavelet_highfreq_band_height[col] = cwtmatr_norm_height[:,col][peak_indices[pos_of_third_peak]]
-                else:
-                    #print('Third freq cannot be classified, sample: ' + str(col) + '. It is ' + str(freq_of_third_peak) + ' - whereas prev low is ' + str(prev_lowfreq) + ' and prev high is ' + str(prev_highfreq) + ' and prev very high freq is ' + str(prev_vhighfreq))
-                    tmp=0
-            except IndexError as error:
-            #only set previous value to nan if there have not yet been any values in this frequency band
-                if col==0 or np.isnan(prev_vhighfreq):
-                    prev_vhighfreq = np.nan
-
-        # for the next column - set new frequencies that you want to assign each band to
-        if col == 0 :
-            prev_lowfreq = wavelet_lowfreq_band[col] 
-            prev_highfreq = wavelet_highfreq_band[col] 
-            prev_vhighfreq = wavelet_vhighfreq_band[col] 
-        else:
-            #the updated prev_freq is based on an average of the last N points
-            if (col>0) and (col<=num_to_avg):
-                start=0
-            else:
-                start=col-num_to_avg
-            mean_lowfreq = np.nanmean(wavelet_lowfreq_band[start:col])
-            mean_highfreq = np.nanmean(wavelet_highfreq_band[start:col])
-            mean_vhighfreq = np.nanmean(wavelet_vhighfreq_band[start:col])
-            #only update prev freq with a value that is not nan - don't introduce nans
-            if (np.isnan(mean_lowfreq) == False) and (mean_highfreq - wavelet_band_width > mean_lowfreq):
-                prev_lowfreq = mean_lowfreq
-            if (np.isnan(mean_highfreq) == False) and (mean_lowfreq + wavelet_band_width < mean_highfreq):
-                prev_highfreq = mean_highfreq
-            if np.isnan(mean_vhighfreq) == False and (mean_highfreq + wavelet_band_width < mean_vhighfreq):
-                prev_vhighfreq = mean_vhighfreq
-        
-    if CENSOR_bool:
-        #censor the periodicity array and peak num arrays
-        periodicity_percent_spectrum_above_halfmax[censoring_arr_full] = np.nan
-        wavelet_peak_num_censored = np.copy(wavelet_peak_num)
-        wavelet_peak_num_censored[censoring_arr_full] = np.nan
-        wavelet_vhighfreq_band[censoring_arr_full] = np.nan
-        wavelet_highfreq_band[censoring_arr_full] = np.nan
-        wavelet_lowfreq_band[censoring_arr_full] = np.nan
-        wavelet_vhighfreq_band_height[censoring_arr_full] = np.nan
-        wavelet_highfreq_band_height[censoring_arr_full] = np.nan
-        wavelet_lowfreq_band_height[censoring_arr_full] = np.nan
-    else:
-        wavelet_peak_num_censored = None
-
-    del peak_properties
-    del cwtmatr
-    del cwtmatr_norm_height
-    del indices_above_halfmax
-    gc.collect()
-    
-    return periodicity_percent_spectrum_above_halfmax, wavelet_peak_num, wavelet_peak_num_censored, wavelet_vhighfreq_band*60, wavelet_highfreq_band*60, wavelet_lowfreq_band*60, wavelet_vhighfreq_band_height, wavelet_highfreq_band_height, wavelet_lowfreq_band_height
-
-def get_entropy(trace_smoothed, entropy_type, m_val, CENSOR_bool, censoring_arr_full):
+def get_entropy(trace_smoothed, entropy_type, m_val, censoring_arr_full):
     '''Compute the predictability of the time series in a window by calculating sample entropy'''
     #censor the necessary samples before computing entropy
     trace_smoothed_censored = np.copy(trace_smoothed)
-    if CENSOR_bool:
+    if censoring_arr_full is not None:
         trace_smoothed_censored[censoring_arr_full] = np.nan
     
     #reshape from (n,) to (n,1)
@@ -444,7 +233,7 @@ def get_entropy(trace_smoothed, entropy_type, m_val, CENSOR_bool, censoring_arr_
         
     return desired_entropy
 
-def get_entropy_in_inst_window(trace_smoothed, CENSOR_bool, censoring_arr_full, window_size_seconds, sampling_rate, tot_num_samples):
+def get_entropy_in_inst_window(trace_smoothed, censoring_arr_full, window_size_seconds, sampling_rate, tot_num_samples):
     '''this function repeats the get_entropy() function in a for loop of a few seconds - extract instantaneous metric of entropy in this 
     short window'''
     #define window size
@@ -460,10 +249,16 @@ def get_entropy_in_inst_window(trace_smoothed, CENSOR_bool, censoring_arr_full, 
         
         #define window end
         short_window_end_sample = short_window_start_sample + short_window_width
+
+                #if there is a censoring array, extract portion within the window
+        if censoring_arr_full is not None:
+            censoring_arr_window = censoring_arr_full[short_window_start_sample:short_window_end_sample]
+        else:
+            censoring_arr_window = None
         
         #extract entropy in that window
-        entropy_inst[count]= get_entropy(trace_smoothed[short_window_start_sample:short_window_end_sample],'Sample',6, CENSOR_bool,
-                                        censoring_arr_full[short_window_start_sample:short_window_end_sample])
+        entropy_inst[count]= get_entropy(trace_smoothed[short_window_start_sample:short_window_end_sample],'Sample',6,
+                                        censoring_arr_window)
         
         #set next window
         short_window_start_sample = short_window_end_sample
@@ -550,7 +345,7 @@ def extract_all_pulseox_metrics(analysis_type, input_trace, tot_length_seconds, 
         beat_indices, beats_bool, beats_toplot, beat_prominence = find_heart_beats(trace_smoothed, param_dict)
         if fMRI_censoring_mask_csv is not None:
             #find the location of censored breaths within the breath_indices_window
-            location_of_censored = np.where(np.isin(beat_indices,indices_of_censored_samples))
+            location_of_censored = np.where(np.isin(beat_indices, indices_of_censored_samples))
         #resp rate in rolling window - per sample
         HR_inst, HR_inst_censored = get_HR_inst(beats_bool, censoring_arr_full, window_length, sampling_rate)
         
@@ -573,23 +368,23 @@ def extract_all_pulseox_metrics(analysis_type, input_trace, tot_length_seconds, 
                 ax.set_title('Quality Control Heart Beat Detection')
                 ax.legend(ncol=3)
                 if image_output_type == 'svg':
-                    fig.savefig(output_name + '_start_' + str(int(time_array[start])) + 's.svg')
+                    fig.savefig(output_name + '/QC_pleth-start_' + str(int(time_array[start])) + 's.svg')
                 else:
-                    fig.savefig(output_name + '_start_' + str(int(time_array[start])) + 's.png')
+                    fig.savefig(output_name + '/QC_pleth-start_' + str(int(time_array[start])) + 's.png')
                 plt.close()
                 start = start + samples_per_iteration
                 end = end + samples_per_iteration
             #save outputs
             if fMRI_censoring_mask_csv is not None:
                 df_basic = pd.DataFrame({'HR_censored': HR_inst_censored})     
-                df_basic.to_csv(output_name + "HR_censored.csv")
+                df_basic.to_csv(output_name + "/HR_censored.csv")
             else:
                 df_basic = pd.DataFrame({'HR': HR_inst})     
-                df_basic.to_csv(output_name + "HR.csv")       
+                df_basic.to_csv(output_name + "/HR.csv")       
         ######################################### COMPUTE METRICS ######################
         if analysis_type == 'compute_metrics':
             #resp rate in rolling window - per sample
-            HR_inst, HR_inst_censored = get_HR_inst(beats_bool, CENSOR_bool, censoring_arr_full, window_length, sampling_rate)
+            HR_inst, HR_inst_censored = get_HR_inst(beats_bool, censoring_arr_full, window_length, sampling_rate)
 
             #extract period between breaths - per beat pair
             period_btw_beats, period_ssd = get_period(beats_bool, sampling_rate)
@@ -603,69 +398,34 @@ def extract_all_pulseox_metrics(analysis_type, input_trace, tot_length_seconds, 
 
             #get the width of the pulse (at 1/4, 1/2 heights and base) - per beat
             width_quart, width_half, width_base= get_pulse_shape_metrics(trace_smoothed, beat_indices,sampling_rate)
-
-            #extract periodicty - % wavelet above halfmax - per sample
-            periodicty_percent_above_halfmax, wavelet_peak_num, wavelet_peak_num_censored, HR_from_wavelet_vhf, HR_from_wavelet_hf, HR_from_wavelet_lf, wavelet_peak_height_vhf, wavelet_peak_height_hf, wavelet_peak_height_lf = get_periodiocity_wavelet(trace_smoothed, CENSOR_bool, censoring_arr_full, sampling_rate, time_array,tot_num_samples, output_name, 
-                                 wavelet_band_width, wavelet_peak_dist, num_bands_to_detect, num_to_avg, wavelet, wavelet_norm)
-             #extract entropy in a 5s window 
+            
+            #extract entropy in a 5s window 
             with warnings.catch_warnings():
                 warnings.simplefilter(action = "ignore", category = RuntimeWarning)
-                entropy_inst, entropy_inst_full_length = get_entropy_in_inst_window(trace_smoothed, CENSOR_bool, censoring_arr_full, 5,
+                entropy_inst, entropy_inst_full_length = get_entropy_in_inst_window(trace_smoothed, censoring_arr_full, 5,
                                                                                     sampling_rate, tot_num_samples)
 
-            ########################################## PLOT INSTANTANEOUS METRICS - for QC ###############
-            #for the metrics where there is only one value per breath, repeat same value until next breath
-            period_btw_beats_toplot = repeat_values_for_plotting(period_btw_beats, beats_bool, beat_indices)
-            hrv_inst_std_period_toplot = repeat_values_for_plotting(hrv_inst_std_period, beats_bool, beat_indices)
-            hrv_inst_rmssd_period_toplot = repeat_values_for_plotting(hrv_inst_rmssd_period, beats_bool, beat_indices)
-            pvi_inst_toplot = repeat_values_for_plotting(pvi_inst, beats_bool, beat_indices)
-            width_quart_toplot = repeat_values_for_plotting(width_quart, beats_bool, beat_indices)
+            ################## SAVE OUTPUTS ################
+                        #for the metrics where there is only one value per breath, repeat same value until next breath
+            period_btw_beats_persample = repeat_values_for_plotting(period_btw_beats, beats_bool, beat_indices)
+            hrv_inst_std_period_persample = repeat_values_for_plotting(hrv_inst_std_period, beats_bool, beat_indices)
+            hrv_inst_rmssd_period_persample = repeat_values_for_plotting(hrv_inst_rmssd_period, beats_bool, beat_indices)
+            pvi_inst_persample = repeat_values_for_plotting(pvi_inst, beats_bool, beat_indices)
 
-            #plot each 20s segment
-            samples_per_iteration = int(sampling_rate*20)
-            start = 0
-            end = samples_per_iteration
-            while end < tot_num_samples: 
-                fig, ax = plt.subplots(figsize = (12,4))
-                #plot the respiration trace and the detected breaths to make sure that they were properly detected
-                ax.plot(time_array[start:end], 2*trace_smoothed[start:end]+ np.nanmax(HR_inst), label = 'Smoothed Pulseox Trace')
-                ax.plot(time_array[start:end], 2*beats_toplot[start:end]+ np.nanmax(HR_inst), '.', label = 'Detected Beat')
-                ax.plot(time_array[start:end], HR_inst[start:end], label = 'Resp Rate')
-                ax.plot(time_array[start:end], 50*period_btw_beats_toplot[start:end], label = 'Period (x50)')
-                ax.plot(time_array[start:end], 1000*hrv_inst_std_period_toplot[start:end], label = 'HRV-std (x1000)')
-                ax.plot(time_array[start:end], 1000*hrv_inst_rmssd_period_toplot[start:end], label = 'HRV-rmssd (x1000)')
-                ax.plot(time_array[start:end], pvi_inst_toplot[start:end], label = 'PVI')
-                ax.plot(time_array[start:end], 100*width_quart_toplot[start:end], label = 'Width at quarter height (x100)')
-                ax.plot(time_array[start:end], 5*periodicty_percent_above_halfmax[start:end], label = 'Periodicity (% wavelet above HM)(x5)')
-                ax.plot(time_array[start:end], 50*wavelet_peak_num[start:end], label = 'Number of wavelet peaks (x50)')
-                ax.plot(time_array[start:end], 1000*entropy_inst_full_length[start:end], label = 'Entropy (x1000)')
-                if fMRI_censoring_mask_csv:
-                    ax.fill_between(time_array[start:end], 0, 1, where=censoring_arr_full[start:end], facecolor='red', alpha=0.2,
-                                    transform=ax.get_xaxis_transform())
-                ax.set_xlabel('Time (s)')
-                ax.set_title('Quality Control Heart Beat Extraction')
-                ax.legend()
-                if image_output_type == 'svg':
-                    fig.savefig(output_name + '_start_' + str(int(time_array[start])) + 's.svg')
-                else:
-                    fig.savefig(output_name + '_start_' + str(int(time_array[start])) + 's.png')
-                plt.close()
-                start = start + samples_per_iteration
-                end = end + samples_per_iteration
-
-            ################## SAVE OUTPUTS ################3
-            df_persample = pd.DataFrame({'Pulseox_trace_smoothed': trace_smoothed, 'Beats': beats_toplot, 'HR': HR_inst, 'Period': period_btw_beats_toplot, 
-                                        'HRV_std': hrv_inst_std_period_toplot, 'HRV_rmssd': hrv_inst_rmssd_period_toplot, 'PVI': pvi_inst_toplot, 'Periodicity': periodicty_percent_above_halfmax, 'Entropy': entropy_inst_full_length})     
-            df_persample.to_csv(output_name + "_per_sample.csv")
-
+            df_persample = pd.DataFrame({'Pulseox_trace_smoothed': trace_smoothed, 'Beats': beats_toplot, 'HR': HR_inst, 'Period': period_btw_beats_persample, 
+                                        'HRV_std': hrv_inst_std_period_persample, 'HRV_rmssd': hrv_inst_rmssd_period_persample, 'PVI': pvi_inst_persample, 'Entropy': entropy_inst_full_length})     
+            df_persample.to_csv(output_name + "/pleth_metrics_per_sample.csv")
 
             ######################################### EXTRACT AVERAGE METRICS IN WINDOW ##################
         if (analysis_type == 'compute_metrics') & (large_window_width is not None):
-            #create arrays to store the values for for all windows
-            num_windows = 1+int((tot_length_seconds - large_window_width)/large_window_overlap)#numerator gives last start, frac gives num starts
-            metrics_in_window = np.zeros((num_windows,21))
-            if num_bands_to_detect==3:
-                HR_vhigh_in_window = np.zeros((num_windows,2))
+            #if no overlap is provided, set it to 0
+            if large_window_overlap is None:
+                large_window_overlap = 0
+                #create arrays to store the values for for all windows
+                num_windows = int(tot_length_seconds/large_window_width) 
+            else:
+                num_windows = 1+int((tot_length_seconds - large_window_width)/large_window_overlap) #numerator gives last start, frac gives num starts
+            metrics_in_window = np.zeros((num_windows,15))
 
             #extract a time window
             large_window_start_realtime = 0 
@@ -701,49 +461,32 @@ def extract_all_pulseox_metrics(analysis_type, input_trace, tot_length_seconds, 
                 #extract mean of instantaneous pvi in that window
                 metrics_in_window[count,6] = np.mean(pvi_inst[beat_indices_window])
 
-                #extract mean of instantaneous periodicity in that window
-                metrics_in_window[count,7] = np.nanmean(periodicty_percent_above_halfmax[large_window_start_samplenum:large_window_end_samplenum])
-                metrics_in_window[count,8] = np.nanmean(wavelet_peak_num[large_window_start_samplenum:large_window_end_samplenum])
-                metrics_in_window[count,9] = np.nanmean(HR_from_wavelet_hf[large_window_start_samplenum:large_window_end_samplenum])
-                metrics_in_window[count,10] = np.nanmean(HR_from_wavelet_lf[large_window_start_samplenum:large_window_end_samplenum])
-                metrics_in_window[count,11] = np.nanmean(wavelet_peak_height_hf[large_window_start_samplenum:large_window_end_samplenum])
-                metrics_in_window[count,12] = np.nanmean(wavelet_peak_height_lf[large_window_start_samplenum:large_window_end_samplenum])
-
                 #extract mean of instantaneous entropy in that window
-                metrics_in_window[count,13] = np.mean(entropy_inst_full_length[large_window_start_samplenum:large_window_end_samplenum])
+                metrics_in_window[count,7] = np.mean(entropy_inst_full_length[large_window_start_samplenum:large_window_end_samplenum])
 
                 #extract overall resp rate across whole window (can't censor breaths or will give inaccurate rate
-                metrics_in_window[count,14] = (60/large_window_width)*(beat_indices[beat_indices_window_nocensor].size)
+                metrics_in_window[count,8] = (60/large_window_width)*(beat_indices[beat_indices_window_nocensor].size)
 
                 #extract mean period and variability in period (RRV) across whole window
-                metrics_in_window[count,15] = np.mean(period_btw_beats[beat_indices_window])
-                metrics_in_window[count,16] = np.std(period_btw_beats[beat_indices_window])
-                metrics_in_window[count,17] = np.mean(period_ssd[beat_indices_window])**(1/2)
+                metrics_in_window[count,9] = np.mean(period_btw_beats[beat_indices_window])
+                metrics_in_window[count,10] = np.std(period_btw_beats[beat_indices_window])
+                metrics_in_window[count,11] = np.mean(period_ssd[beat_indices_window])**(1/2)
 
                 #extract mean widths in that window
-                metrics_in_window[count,18] = np.mean(width_quart[beat_indices_window])
-                metrics_in_window[count,19] = np.mean(width_half[beat_indices_window])
-                metrics_in_window[count,20] = np.mean(width_base[beat_indices_window])
+                metrics_in_window[count,12] = np.mean(width_quart[beat_indices_window])
+                metrics_in_window[count,13] = np.mean(width_half[beat_indices_window])
+                metrics_in_window[count,14] = np.mean(width_base[beat_indices_window])
 
                 #NOTE: I am NOT extracting the entropy across the whole window due to prohibitive memory/time constraints - also preliminary         
                 #analysis showed that entropy across the whole window is very highly correlated with mean of instantaneous entropy.
-
-                #only if I expect 3 wavelet freq, calc the means in windows
-                if num_bands_to_detect==3:
-                    HR_vhigh_in_window[count, 0] = np.nanmean(HR_from_wavelet_vhf[large_window_start_samplenum:large_window_end_samplenum])
-                    HR_vhigh_in_window[count, 1] = np.nanmean(wavelet_peak_height_vhf[large_window_start_samplenum:large_window_end_samplenum])
 
                 #set the start time of the next window in realtime
                 large_window_start_realtime = large_window_end_realtime - large_window_overlap
                 count = count+1
 
             ######################################## SAVE OUTPUTS ######################################
-            df_onesample_per_window = pd.DataFrame(metrics_in_window, columns = ['Window start time','Window end time','Instantaneous HR-window mean', 'Instantaneous HR - window std', 'Instantaneous HRV period std-window mean','Instantanous HRV period rmssd-window mean', 'Instantaneous PVI-window mean','Instantaneous periodicity-window mean', 'Instantaneous number of wavelet peaks-window mean','Instantaneous highfreq HR from wavelet-window mean', 'Instantaneous lowfreq HR from wavelet-window mean', 'Instantaneous highfreq peak height-window mean','Instantaneous lowfreq peak height-window mean','Instantaneous entropy-window mean','HR-overall window','Period-overall window mean', 'HRV-overall period window std', 'HRV-overall period window rmssd', 'Width at quarter height-overall window mean', 'width at half height-overall window mean','Width at base-overall window mean'])
-            if num_bands_to_detect==3:
-                df_onesample_per_window.insert(9, 'Instantaneous veryhighfreq HR from wavelet-window mean', HR_vhigh_in_window[:, 0])
-                df_onesample_per_window.insert(12, 'Instantaneous veryhighfreq peak height-window mean', HR_vhigh_in_window[:, 1])
-
-            df_onesample_per_window.to_csv(output_name + "_per_window.csv")
+            df_onesample_per_window = pd.DataFrame(metrics_in_window, columns = ['Window start time','Window end time','Instantaneous HR-window mean', 'Instantaneous HR - window std', 'Instantaneous HRV period std-window mean','Instantanous HRV period rmssd-window mean', 'Instantaneous PVI-window mean','Instantaneous entropy-window mean','HR-overall window','Period-overall window mean', 'HRV-overall period window std', 'HRV-overall period window rmssd', 'Width at quarter height-overall window mean', 'width at half height-overall window mean','Width at base-overall window mean'])
+            df_onesample_per_window.to_csv(output_name + "/pleth_metrics_per_window.csv")
     else:
         raise Exception('analysis_type is not valid. Please enter one of the three options: wavelet_only, peak_detection_only or compute_metrics.')
 

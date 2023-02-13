@@ -32,24 +32,25 @@ import EntropyHub as EH
 import gc
 import ast
 import os
+import sys
 
 ######################################## Take the arguments from bash ##################################
-analysis_type=sys.argv[2]
-input_trace=os.path.abspath(sys.argv[3])
-tot_length_seconds=ast.literal_eval(sys.argv[4])
-output_name=sys.argv[5]
-image_output_type=sys.argv[6]
-peak_detection_parameter_csv=os.path.abspath(sys.argv[7])
-invert_bool=ast.literal_eval(sys.argv[8])
-window_length=ast.literal_eval(sys.argv[9])
-fMRI_censoring_mask_csv=os.path.abspath(sys.argv[10])
-fMRI_TR=ast.literal_eval(sys.argv[11])
-large_window_width=ast.literal_eval(sys.argv[12])
-large_window_overlap=ast.literal_eval(sys.argv[13])
+analysis_type=sys.argv[1]
+input_trace=os.path.abspath(sys.argv[2])
+tot_length_seconds=ast.literal_eval(sys.argv[3])
+output_name=os.path.abspath(sys.argv[4])
+image_output_type=sys.argv[5]
+peak_detection_parameter_csv=os.path.abspath(sys.argv[6])
+invert_bool=ast.literal_eval(sys.argv[7])
+window_length=ast.literal_eval(sys.argv[8])
+fMRI_censoring_mask_csv=os.path.abspath(sys.argv[9])
+fMRI_TR=ast.literal_eval(sys.argv[10])
+large_window_width=ast.literal_eval(sys.argv[11])
+large_window_overlap=ast.literal_eval(sys.argv[12])
 
-if peak_detection_parameter_csv == 'None':
+if 'None' in peak_detection_parameter_csv:
     peak_detection_parameter_csv = None
-if fMRI_censoring_mask_csv == 'None':
+if 'None' in fMRI_censoring_mask_csv:
     fMRI_censoring_mask_csv = None
 
 ######################################## FUNCTIONS #################################
@@ -135,7 +136,10 @@ def get_resp_rate_inst(breaths, censoring_arr_full, window_length, sampling_rate
     if censoring_arr_full is not None:
         #censor the necessary samples by setting them to nan
         resp_rate_smooth_censored = np.copy(resp_rate_smooth)
-        resp_rate_smooth_censored[censoring_arr_full] = np.nan
+        try:
+            resp_rate_smooth_censored[censoring_arr_full] = np.nan
+        except:
+            print("The duration of the respiration trace does not match the duration of the fMRI censoring csv. Check the number of samples in both csvs as well as the specified fMRI_TR and tot_length_seconds options.")
     else:
         resp_rate_smooth_censored = None
         
@@ -188,39 +192,19 @@ def get_wavelet(resp_trace_smoothed_detrend, sampling_rate, time_array,tot_num_s
     plt.ylabel('Frequency (bpm)')
     plt.colorbar()
     if image_output_type == 'svg':
-        plt.savefig(output_name +  '_wavelet_transform.svg')
+        plt.savefig(output_name +  '/respiration_wavelet_transform.svg')
     else:
-        plt.savefig(output_name +  '_wavelet_transform.png')
+        plt.savefig(output_name +  '/respiration_wavelet_transform.png')
     
     return cwtmatr
 
-def get_periodiocity_wavelet(CENSOR_bool, censoring_arr_full, sampling_rate, time_array,tot_num_samples, cwtmatr):
-    '''this function examines how power from the wavelet is concentrated across the frequencies'''
-
-    #calculate the % that are located above the half max (gives approx measure of spread)
-    periodicity_percent_spectrum_above_halfmax = pd.Series(np.repeat(np.nan, tot_num_samples))
-    halfmax = np.max(cwtmatr, axis = 0)/2
-    for col in range(0,tot_num_samples):
-        indices_above_halfmax = np.where(cwtmatr[:,col] >= halfmax[col])[0]
-        periodicity_percent_spectrum_above_halfmax[col] = 100*len(indices_above_halfmax)/100 #100 points per spectrum
-
-    if CENSOR_bool:
-        #censor the periodicity array
-        periodicity_percent_spectrum_above_halfmax_censored = np.copy(periodicity_percent_spectrum_above_halfmax)
-        periodicity_percent_spectrum_above_halfmax_censored[censoring_arr_full] = np.nan
-    else:
-        periodicity_percent_spectrum_above_halfmax_censored = None
-    
-    return periodicity_percent_spectrum_above_halfmax, periodicity_percent_spectrum_above_halfmax_censored
-
-
-def get_entropy(resp_trace_smoothed_detrend, entropy_type, m_val, CENSOR_bool, censoring_arr_full):
+def get_entropy(resp_trace_smoothed_detrend, entropy_type, m_val, censoring_arr_full):
     '''Compute the predictability of the time series in a window by calculating sample entropy. m is the size of a template for which the 
     remaining data is scanned to see if this template repeats within a tolerance of r. A and B are the number of template matches for 
     template sizes of m and m+1, respectively. The sample entropy output contains values for all m values from 0 to the specified value'''
     
     resp_trace_smoothed_detrend_censored = np.copy(resp_trace_smoothed_detrend)
-    if CENSOR_bool:
+    if censoring_arr_full is not None:
         #censor the necessary samples before computing entropy
         resp_trace_smoothed_detrend_censored[censoring_arr_full] = np.nan
     
@@ -255,7 +239,7 @@ def downsample_to_once_per_sec(series_to_downsample, tot_num_samples, tot_length
         series_downsampled = np.nanmean(series_reshaped, axis=0)
     return pd.Series(series_downsampled)
 
-def get_entropy_in_inst_window(resp_trace_smoothed_detrend, CENSOR_bool, censoring_arr_full, window_size_seconds, sampling_rate, tot_num_samples):
+def get_entropy_in_inst_window(resp_trace_smoothed_detrend, censoring_arr_full, window_size_seconds, sampling_rate, tot_num_samples):
     '''this function repeats the get_entropy() function in a for loop of a few seconds - extract instantaneous metric of entropy in this 
     short window'''
     #define window size
@@ -272,9 +256,15 @@ def get_entropy_in_inst_window(resp_trace_smoothed_detrend, CENSOR_bool, censori
         #define window end
         short_window_end_sample = short_window_start_sample + short_window_width
         
+        #if there is a censoring array, extract portion within the window
+        if censoring_arr_full is not None:
+            censoring_arr_window = censoring_arr_full[short_window_start_sample:short_window_end_sample]
+        else:
+            censoring_arr_window = None
+
         #extract entropy in that window
-        entropy_inst[count]= get_entropy(resp_trace_smoothed_detrend[short_window_start_sample:short_window_end_sample],'Sample',4, CENSOR_bool,
-                                        censoring_arr_full[short_window_start_sample:short_window_end_sample])
+        entropy_inst[count]= get_entropy(resp_trace_smoothed_detrend[short_window_start_sample:short_window_end_sample],'Sample',4,
+                                        censoring_arr_window)
             
         #set next window
         short_window_start_sample = short_window_end_sample
@@ -377,24 +367,24 @@ def extract_all_resp_metrics(analysis_type, input_trace, tot_length_seconds, out
                 ax.set_title('Quality Control Breath Detection')
                 ax.legend(ncol = 3)
                 if image_output_type == 'svg':
-                    fig.savefig(output_name + '_start_' + str(int(time_array[start])) + 's.svg')
+                    fig.savefig(output_name + '/QC_resp-start_' + str(int(time_array[start])) + 's.svg')
                 else:
-                    fig.savefig(output_name + '_start_' + str(int(time_array[start])) + 's.png')
+                    fig.savefig(output_name + '/QC_resp-start_' + str(int(time_array[start])) + 's.png')
                 plt.close()
                 start = start + samples_per_iteration
                 end = end + samples_per_iteration
             # save outputs
             if fMRI_censoring_mask_csv is not None:
                 df_basic = pd.DataFrame({'RR_censored': resp_rate_inst_censored})     
-                df_basic.to_csv(output_name + "RR_censored.csv")
+                df_basic.to_csv(output_name + "/RR_censored.csv")
             else:
                 df_basic = pd.DataFrame({'RR': resp_rate_inst})     
-                df_basic.to_csv(output_name + "RR.csv")
+                df_basic.to_csv(output_name + "/RR.csv")
 
         if analysis_type == 'compute_metrics':
-            ######################################### EXTRACT INSTANTANEOUS METRICS ######################
+            ######################################### COMPUTE METRICS ######################
             #resp rate in rolling window - per sample
-            resp_rate_inst, resp_rate_inst_censored = get_resp_rate_inst(breaths_bool, CENSOR_bool, censoring_arr_full, window_length, sampling_rate)
+            resp_rate_inst, resp_rate_inst_censored = get_resp_rate_inst(breaths_bool, censoring_arr_full, window_length, sampling_rate)
 
             #extract period between breaths - per breath pair
             period_btw_breaths, period_ssd = get_period(breath_indices, sampling_rate)
@@ -402,60 +392,31 @@ def extract_all_resp_metrics(analysis_type, input_trace, tot_length_seconds, out
             #extract RRV - std/rmssd of period in rolling window of 4 breaths - per breath
             rrv_inst_std_period, rrv_inst_rmssd_period = get_inst_rrv(period_btw_breaths, period_ssd, 4)
 
-            #extract periodicty - % wavelet above halfmax - per sample
-            periodicty_percent_above_halfmax, periodicty_percent_above_halfmax_cens = get_periodiocity_wavelet(CENSOR_bool, censoring_arr_full, sampling_rate, time_array, tot_num_samples, wavelet)
-
             #extract entropy in a 5s window 
             with warnings.catch_warnings():
                 warnings.simplefilter(action = "ignore", category = RuntimeWarning)
-                entropy_inst, entropy_inst_full_length = get_entropy_in_inst_window(resp_trace_smoothed_detrend, CENSOR_bool, censoring_arr_full, 5,
+                entropy_inst, entropy_inst_full_length = get_entropy_in_inst_window(resp_trace_smoothed_detrend, censoring_arr_full, 5,
                                                                                     sampling_rate,tot_num_samples)
 
-            ########################################## PLOT ALL INSTANTANEOUS METRICS ###############
-            #for the metrics where there is only one value per breath, repeat same value until next breath
-            period_btw_breaths_toplot = repeat_values_for_plotting(period_btw_breaths, breaths_bool, breath_indices)
-            rrv_inst_std_period_toplot = repeat_values_for_plotting(rrv_inst_std_period, breaths_bool, breath_indices)
-            rrv_inst_rmssd_period_toplot = repeat_values_for_plotting(rrv_inst_rmssd_period, breaths_bool, breath_indices)
+            ################## SAVE OUTPUTS ################
+            period_btw_breaths_persample = repeat_values_for_plotting(period_btw_breaths, breaths_bool, breath_indices)
+            rrv_inst_std_period_persample = repeat_values_for_plotting(rrv_inst_std_period, breaths_bool, breath_indices)
+            rrv_inst_rmssd_period_persample = repeat_values_for_plotting(rrv_inst_rmssd_period, breaths_bool, breath_indices)
 
-            #plot each 30s segment
-            samples_per_iteration = int(sampling_rate*30)
-            start = 0
-            end = samples_per_iteration
-            while end < tot_num_samples: 
-                fig, ax = plt.subplots(figsize = (12,4))
-                #plot the respiration trace and the detected breaths to make sure that they were properly detected
-                ax.plot(time_array[start:end], resp_trace_smoothed_detrend[start:end]+60, label = 'Smoothed Resp Trace')
-                ax.plot(time_array[start:end], breaths_toplot[start:end]+60, '*', label = 'Detected Breath')
-                ax.plot(time_array[start:end], resp_rate_inst[start:end], label = 'Resp Rate')
-                ax.plot(time_array[start:end], 50*period_btw_breaths_toplot[start:end], label = 'Period (x50)')
-                ax.plot(time_array[start:end], 100*rrv_inst_std_period_toplot[start:end], label = 'RRV-std (x100)')
-                ax.plot(time_array[start:end], 100*rrv_inst_rmssd_period_toplot[start:end], label = 'RRV-rmssd (x100)')
-                ax.plot(time_array[start:end], periodicty_percent_above_halfmax[start:end], label = 'Periodicity (% wavelet above HM)')
-                ax.plot(time_array[start:end], 100*entropy_inst_full_length[start:end], label = 'Entropy (x100)')
-                if fMRI_censoring_mask_csv is not None:
-                    ax.fill_between(time_array[start:end], 0, 1, where=censoring_arr_full[start:end], facecolor='red', alpha=0.2,
-                                    transform=ax.get_xaxis_transform())
-                ax.set_xlabel('Time (s)')
-                ax.set_title('Quality Control Breath Extraction')
-                ax.legend()
-                if image_output_type == 'svg':
-                    fig.savefig(output_name + '_start_' + str(int(time_array[start])) + 's.svg')
-                else:
-                    fig.savefig(output_name + '_start_' + str(int(time_array[start])) + 's.png')
-                plt.close()
-                start = start + samples_per_iteration
-                end = end + samples_per_iteration
-
-            ################## SAVE OUTPUTS ################3
-            df_persample = pd.DataFrame({'Resp_trace_smoothed': resp_trace_smoothed_detrend, 'Breaths': breaths_toplot, 'RR': resp_rate_inst, 'Period': period_btw_breaths_toplot, 
-                                        'RRV_std': rrv_inst_std_period_toplot, 'RRV_rmssd': rrv_inst_rmssd_period_toplot, 'Periodicity': periodicty_percent_above_halfmax, 'Entropy': entropy_inst_full_length})     
-            df_persample.to_csv(output_name + "_per_sample.csv")
+            df_persample = pd.DataFrame({'Resp_trace_smoothed': resp_trace_smoothed_detrend, 'Breaths': breaths_toplot, 'RR': resp_rate_inst, 'Period': period_btw_breaths_persample, 
+                                        'RRV_std': rrv_inst_std_period_persample, 'RRV_rmssd': rrv_inst_rmssd_period_persample, 'Entropy': entropy_inst_full_length})     
+            df_persample.to_csv(output_name + "/resp_metrics_per_sample.csv")
 
     ######################################### EXTRACT AVERAGE METRICS IN WINDOW ##################
         if (analysis_type == 'compute_metrics') & (large_window_width is not None):
-            #create arrays to store the values for for all windows
-            num_windows = 1+int((tot_length_seconds - large_window_width)/large_window_overlap)#numerator gives last start, frac gives num starts
-            metrics_in_window = np.zeros((num_windows,13))
+            #if no overlap is provided, set it to 0
+            if large_window_overlap is None:
+                large_window_overlap = 0
+                #create arrays to store the values for for all windows
+                num_windows = int(tot_length_seconds/large_window_width) 
+            else:
+                num_windows = 1+int((tot_length_seconds - large_window_width)/large_window_overlap) #numerator gives last start, frac gives num starts
+            metrics_in_window = np.zeros((num_windows,11))
 
             #extract a time window
             large_window_start_realtime = 0 
@@ -488,40 +449,27 @@ def extract_all_resp_metrics(analysis_type, input_trace, tot_length_seconds, out
                 metrics_in_window[count,4] = np.mean(rrv_inst_std_period[breath_indices_window])
                 metrics_in_window[count,5] = np.mean(rrv_inst_rmssd_period[breath_indices_window])
 
-                #extract mean of instantaneous periodicity in that window
-                if fMRI_censoring_mask_csv is not None:
-                    metrics_in_window[count,6] = np.nanmean(periodicty_percent_above_halfmax_cens[large_window_start_samplenum:large_window_end_samplenum])
-                else:
-                    metrics_in_window[count,6] = np.nanmean(periodicty_percent_above_halfmax[large_window_start_samplenum:large_window_end_samplenum])
-
                 #extract mean of instantaneous entropy in that window
-                metrics_in_window[count,7] = np.mean(entropy_inst_full_length[large_window_start_samplenum:large_window_end_samplenum])
+                metrics_in_window[count,6] = np.mean(entropy_inst_full_length[large_window_start_samplenum:large_window_end_samplenum])
 
                 #extract overall resp rate across whole window (can't censor breaths or will give inaccurate rate
-                metrics_in_window[count,8] = (60/large_window_width)*(breath_indices[breath_indices_window].size)
+                metrics_in_window[count,7] = (60/large_window_width)*(breath_indices[breath_indices_window].size)
 
                 #extract mean period and variability in period (RRV) across whole window
-                metrics_in_window[count,9] = np.mean(period_btw_breaths[breath_indices_window])
-                metrics_in_window[count,10] = np.std(period_btw_breaths[breath_indices_window])
-                metrics_in_window[count,11] = np.mean(period_ssd[breath_indices_window])**(1/2)
+                metrics_in_window[count,8] = np.mean(period_btw_breaths[breath_indices_window])
+                metrics_in_window[count,9] = np.std(period_btw_breaths[breath_indices_window])
+                metrics_in_window[count,10] = np.mean(period_ssd[breath_indices_window])**(1/2)
 
-                #extract entropy across whole window (I have to do two half windows because of errors with memory allocation)
-                large_window_end_samplenum_half = int(large_window_start_samplenum + sampling_rate*large_window_width/2)
-                entropy_window_1half = get_entropy(resp_trace_smoothed_detrend[large_window_start_samplenum:large_window_end_samplenum_half],
-                                                'Approximate', 4, CENSOR_bool,
-                                                censoring_arr_full[large_window_start_samplenum:large_window_end_samplenum_half])
-                entropy_window_2half = get_entropy(resp_trace_smoothed_detrend[large_window_end_samplenum_half:large_window_end_samplenum],
-                                                'Approximate', 4, CENSOR_bool,
-                                                censoring_arr_full[large_window_start_samplenum:large_window_end_samplenum_half])
-                metrics_in_window[count,12] = np.mean([entropy_window_1half, entropy_window_2half])
+                #NOTE: I am NOT extracting the entropy across the whole window due to prohibitive memory/time constraints - also preliminary         
+                #analysis showed that entropy across the whole window is very highly correlated with mean of instantaneous entropy.
 
                 #set the start time of the next window in realtime
                 large_window_start_realtime = large_window_end_realtime - large_window_overlap
                 count = count+1
 
             ######################################## SAVE OUTPUTS ######################################
-            df_onesample_per_window = pd.DataFrame(metrics_in_window, columns = ['Window start time','Window end time','Instantaneous resp rate-window mean', 'Instantaneous resp rate - window std', 'Instantaneous RRV period std-window mean','Instantanous RRV period rmssd-window mean', 'Instantaneous periodicity-window mean', 'Instantaneous entropy-window mean','Resp rate-overall window','Period-overall window mean', 'RRV-overall period window std', 'RRV-overall period window rmssd', 'Entropy-overall window'])     
-            df_onesample_per_window.to_csv(output_name + "_per_window.csv")
+            df_onesample_per_window = pd.DataFrame(metrics_in_window, columns = ['Window start time','Window end time','Instantaneous resp rate-window mean', 'Instantaneous resp rate - window std', 'Instantaneous RRV period std-window mean','Instantanous RRV period rmssd-window mean', 'Instantaneous entropy-window mean','Resp rate-overall window','Period-overall window mean', 'RRV-overall period window std', 'RRV-overall period window rmssd'])     
+            df_onesample_per_window.to_csv(output_name + "/resp_metrics_per_window.csv")
     else:
         raise Exception('analysis_type is not valid. Please enter one of the three options: wavelet_only, peak_detection_only or compute_metrics.')
 
