@@ -30,13 +30,20 @@ Usage: execute_analysis.sh [--output_path <arg>] [--output_image_type <arg>] [--
         --fMRI_TR: If providing the fMRI_censoring_mask_csv, specify also the TR with which the fMRI data was acquired, in seconds. (default: '1.0')
         --average_metrics_window_length: If wish to compute the average of each metric in a time window, choose the window length (e.g 120s). Only executes when analysis_type=compute_metrics (default: 'None')
         --average_metrics_window_overlap: If wish to compute the average of each metric in a rolling time window, choose the overlap between windows (e.g 60s). Only executes when analysis_type=compute_metrics (default: 'None')
-        -h, --help: Prints help ```
- 
- ## Step 1: Obtain wavelet transform
- The wavelet transform is a data-driven approach to obtain the spectral (frequency) properties of the input trace. It provides an estimate of the power across frequencies at each timepoint and is robust to noise. Thus, by examining at the wavelet transform of the respiration trace, you will be able to see the instantaneous respiration rate for each sample. By examining the wavelet transform of the plethysmography trace, you will see frequency bands for both the respiration rate and heart rate. This is convenient for getting a quick overview of your data and for performing quality control of later calculations that rely on detecting peaks in the data. NOTE: the wavelet transform is not typically used to extract values of respiration/heart rate and cannot provide other measures such as PVI.
-
- # Example
+        -h, --help: Prints help 
 ```
+ 
+ ## Step 0: Activate the environment
+ If running from the CIC, this will look like:
+ ```
 module load anaconda
 conda activate phgy_analysis
+```
+ 
+ ## Step 1: Obtain wavelet transform
+ 
+ The wavelet transform is a data-driven approach to obtain the spectral (frequency) properties of the input trace. It provides an estimate of the power across frequencies at each timepoint and is robust to noise. Thus, by examining at the wavelet transform of the respiration trace, you will be able to see the instantaneous respiration rate for each sample. By examining the wavelet transform of the plethysmography trace, you will see frequency bands for both the respiration rate and heart rate. This is convenient for getting a quick overview of your data and for performing quality control of later calculations that rely on detecting peaks in the data. NOTE: the wavelet transform is not typically used to extract values of respiration/heart rate and cannot provide other measures such as PVI.
+
+ #### Example
+```
 bash execute_analysis.sh respiration wavelet_only /data/scratch2/uromil/2021_fmri_dev/part2_phgy_fmri_project/2_raw_data/phgy_data/dx1_001resp_CLEANEDforTEST.txt 1440 ```
