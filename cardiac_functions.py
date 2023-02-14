@@ -196,9 +196,9 @@ def get_wavelet(trace_smoothed, sampling_rate, time_array, tot_num_samples, outp
     plt.ylabel('Frequency (bpm)')
     plt.colorbar()
     if image_output_type == 'svg':
-        plt.savefig(output_name +  '/pleth_wavelet_transform.svg')
+        plt.savefig(output_name +  'pleth_wavelet_transform.svg')
     else:
-        plt.savefig(output_name +  '/pleth_wavelet_transform.png')
+        plt.savefig(output_name +  'pleth_wavelet_transform.png')
     plt.close()
 
     return cwtmatr, cwtmatr_norm_height
@@ -313,6 +313,8 @@ def extract_all_pulseox_metrics(analysis_type, input_trace, tot_length_seconds, 
     tot_num_samples = len(raw_trace_arr)
     sampling_rate = int(tot_num_samples/tot_length_seconds)
     time_array = np.arange(start=0, stop=tot_length_seconds , step=1/sampling_rate)
+    basename = os.path.splitext(os.path.basename(input_trace))[0]
+    output_name = output_name + "/" + basename + "_"
     
     ####################################### Check user inputs ######################################
     if peak_detection_parameter_csv is not None:
@@ -368,19 +370,19 @@ def extract_all_pulseox_metrics(analysis_type, input_trace, tot_length_seconds, 
                 ax.set_title('Quality Control Heart Beat Detection')
                 ax.legend(ncol=3)
                 if image_output_type == 'svg':
-                    fig.savefig(output_name + '/QC_pleth-start_' + str(int(time_array[start])) + 's.svg')
+                    fig.savefig(output_name + 'QC_pleth-start_' + str(int(time_array[start])) + 's.svg')
                 else:
-                    fig.savefig(output_name + '/QC_pleth-start_' + str(int(time_array[start])) + 's.png')
+                    fig.savefig(output_name + 'QC_pleth-start_' + str(int(time_array[start])) + 's.png')
                 plt.close()
                 start = start + samples_per_iteration
                 end = end + samples_per_iteration
             #save outputs
             if fMRI_censoring_mask_csv is not None:
                 df_basic = pd.DataFrame({'HR_censored': HR_inst_censored})     
-                df_basic.to_csv(output_name + "/HR_censored.csv")
+                df_basic.to_csv(output_name + "HR_censored.csv")
             else:
                 df_basic = pd.DataFrame({'HR': HR_inst})     
-                df_basic.to_csv(output_name + "/HR.csv")       
+                df_basic.to_csv(output_name + "HR.csv")       
         ######################################### COMPUTE METRICS ######################
         if analysis_type == 'compute_metrics':
             #resp rate in rolling window - per sample
@@ -414,7 +416,7 @@ def extract_all_pulseox_metrics(analysis_type, input_trace, tot_length_seconds, 
 
             df_persample = pd.DataFrame({'Pulseox_trace_smoothed': trace_smoothed, 'Beats': beats_toplot, 'HR': HR_inst, 'Period': period_btw_beats_persample, 
                                         'HRV_std': hrv_inst_std_period_persample, 'HRV_rmssd': hrv_inst_rmssd_period_persample, 'PVI': pvi_inst_persample, 'Entropy': entropy_inst_full_length})     
-            df_persample.to_csv(output_name + "/pleth_metrics_per_sample.csv")
+            df_persample.to_csv(output_name + "pleth_metrics_per_sample.csv")
 
             ######################################### EXTRACT AVERAGE METRICS IN WINDOW ##################
         if (analysis_type == 'compute_metrics') & (large_window_width is not None):
@@ -486,7 +488,7 @@ def extract_all_pulseox_metrics(analysis_type, input_trace, tot_length_seconds, 
 
             ######################################## SAVE OUTPUTS ######################################
             df_onesample_per_window = pd.DataFrame(metrics_in_window, columns = ['Window start time','Window end time','Instantaneous HR-window mean', 'Instantaneous HR - window std', 'Instantaneous HRV period std-window mean','Instantanous HRV period rmssd-window mean', 'Instantaneous PVI-window mean','Instantaneous entropy-window mean','HR-overall window','Period-overall window mean', 'HRV-overall period window std', 'HRV-overall period window rmssd', 'Width at quarter height-overall window mean', 'width at half height-overall window mean','Width at base-overall window mean'])
-            df_onesample_per_window.to_csv(output_name + "/pleth_metrics_per_window.csv")
+            df_onesample_per_window.to_csv(output_name + "pleth_metrics_per_window.csv")
     else:
         raise Exception('analysis_type is not valid. Please enter one of the three options: wavelet_only, peak_detection_only or compute_metrics.')
 
