@@ -93,7 +93,8 @@ To fix this, re-run the peak_detection_only step but specify a custom peak_detec
   
   #### Example command
   In this example, we also specify that we want to compute the average metrics over a rolling window of 120s where consecutive windows overlap by 60s.
-  `bash execute_analysis.sh respiration compute_metrics /home/sub-001_ses-1_acq-respiration_run-1.txt 1440 --average_metrics_window_length 120 --average_metrics_window_overlap 60`
+ 
+ `bash execute_analysis.sh respiration compute_metrics /home/sub-001_ses-1_acq-respiration_run-1.txt 1440 --average_metrics_window_length 120 --average_metrics_window_overlap 60`
 or
 
 `bash execute_analysis.sh plethysmography compute_metrics /home/sub-001_ses-1_acq-pulseox_run-1.txt 1440 --average_metrics_window_length 120 --average_metrics_window_overlap 60` 
