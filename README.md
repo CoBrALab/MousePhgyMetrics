@@ -57,6 +57,12 @@ Below is the wavelet transform of a plethysmography trace. The strong red/yellow
  ## Step 2: Detect the breaths and/or heart beats using the default parameters
  
  The breaths and/or heart beats are identified using the scipy.signal.find_peaks() function applied on the respiration and plethysmography traces respectively. This function will detect all peaks that have a certain absolute height, relative hieght, width, vertical and horizontal distance from neighboring peaks. We have set default values for the aforementioned parameters that should result in accurate peak detection for most mouse data. However, under abnormal conditions or in certain mice, the default values won't be appropriate and will result in either under-detection (peaks are skipped and not labelled as breaths when they should be) or over-detection (noise-related fluctuations are incorrectly labelled as breaths). Thus, we recommend first running the peak_detection step with the default values, quality-controlling the outputs, and changing the default parameters to improve peak detection in certain subjects if necessary. 
+
+ The default detection values for breaths in the respiration trace are:
+ 'height': 0.25, 'threshold':None, 'distance': 55, 'prominence': 3, 'width': None, 'wlen': None, 'rel_height': None, 'plateau_size': (1,30).
+
+ The default detection values for heart beats in the plethysmography trace are:
+ 'height': None, 'threshold':None, 'distance': 45, 'prominence': 10, 'width': 50, 'wlen': None,'rel_height': 1, 'plateau_size': (1,200).
  
  #### Example command
  In the following example, we also provide the temporal censoring csv for simultaneously acquired fMRI data. See the file sample_fMRI_censoring_mask.csv for how the csv should be formatted - we used the csvs produced by the RABIES software.
