@@ -104,7 +104,7 @@ or
   
   Plethysmography: heart rate (HR), period, heart rate variability computed from the standard deviation of the period (HRV_std), heart rate variability computed from the root mean square of successive differences between normal heartbeats (HRV_rmssd), plethysmography variability index (PVI) and entropy.
   
-  Respiration: respiration rate (RR), period, resp rate variability computed from the standard deviation of the period (RRV_std), resp rate variability computed from the root mean square of successive differences between normal breaths (RRV_rmssd) and entropy.
+  Respiration: respiration rate (RR), period, respiratory variability (RV) computed from the standard deviation of the detrended-smoothed-respiration trace, resp rate variability (RRV) computed from the standard deviation of the period (RRV_std), resp rate variability computed from the root mean square of successive differences between normal breaths (RRV_rmssd) and entropy.
  
  The output file pleth_metrics_per_sample.csv will contain an instantaneous value of the aforementioned metrics for each sample of the original trace. As the period, HRV and PVI are calculated from beat to beat, the value for these metrics will only change with each new breath. There will be a gap of a few seconds at the start of each csv.
  
