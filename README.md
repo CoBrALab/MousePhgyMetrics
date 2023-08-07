@@ -17,14 +17,15 @@ Create the environment from the provided environment file:`conda env create --fi
 
 ## Complete Command line interface
 ```
-Usage: execute_analysis.sh [--output_path <arg>] [--output_image_type <arg>] [--peak_detection_parameter_csv <arg>] [--window_length <arg>] [--fMRI_censoring_mask_csv <arg>] [--fMRI_TR <arg>] [--average_metrics_window_length <arg>] [--average_metrics_window_overlap <arg>] [-h|--help] <data_type> <analysis_type> <input_trace> <tot_length_seconds>
+Usage: execute_analysis.sh [--output_path <arg>] [--output_image_type <arg>] [--peak_detection_parameter_csv <arg>] [--invert_trace_boolean <arg>] [--window_length <arg>] [--fMRI_censoring_mask_csv <arg>] [--fMRI_TR <arg>] [--average_metrics_window_length <arg>] [--average_metrics_window_overlap <arg>] [-h|--help] <data_type> <analysis_type> <input_trace> <tot_length_seconds>
         <data_type>: Specify either respiration or plethysmography - will determine the processing workflow and metrics extracted
         <analysis_type>: Specify one of three options: wavelet_only, peak_detection_only, compute_metrics. See README for details.
-        <input_trace>: The raw physiological recording, must be a 1D csv file.
+        <input_trace>: The raw physiological recording, must be a 1D .csv or .txt file.
         <tot_length_seconds>: The exact total duration of the provided physiological recording, in seconds.
         --output_path: Prefix to the output csvs and image files. Must not already exist. (default: './physiology_analysis_outputs')
         --output_image_type: Type of image to output, either svg (for publication-level quality) or png (default: 'png')
-        --peak_detection_parameter_csv: Parameters that determine the which peaks in the trace are counted as breaths/heart beats. Refer to the scipy.signal.find_peaks() documentation for the full list of parameters. See README for the default values for each data type. (no default)
+        --peak_detection_parameter_csv: Parameters that determine the which peaks in the trace are counted as breaths/heart beats. Refer to the scipy.signal.find_peaks() documentation for the full list of parameters. See README for the default values for each data type. (default: 'None')
+        --invert_trace_boolean: Whether the raw trace should be inverted (switch peaks and throughs). (default: 'False')
         --window_length: rolling window length (in seconds) over which to smooth respiration trace. (default: '2')
         --fMRI_censoring_mask_csv: If comparing to censored fMRI data, provide the 1D csv of boolean values for each fMRI timepoint, and the physiological outputs will be censored according to the same csv, so that high motion timepoints are excluded from the analysis. (default: 'None')
         --fMRI_TR: If providing the fMRI_censoring_mask_csv, specify also the TR with which the fMRI data was acquired, in seconds. (default: '1.0')
