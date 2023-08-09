@@ -109,7 +109,7 @@ or
   #### Example outputs
   The full list of metrics for each modality is specified below.
   
-  Plethysmography: heart rate (HR), period, heart rate variability computed from the standard deviation of the period (HRV_std), heart rate variability computed from the root mean square of successive differences between normal heartbeats (HRV_rmssd), plethysmography variability index (PVI) and entropy.
+  Plethysmography: heart rate (HR), period, heart rate variability computed from the standard deviation of the period (HRV_std), heart rate variability computed from the root mean square of successive differences between normal heartbeats (HRV_rmssd), plethysmography variability index (PVI), entropy and metrics that characterize the heart beat shape (width at base, width at half max and width at quarter max).
   
   Respiration: respiration rate (RR), period, respiratory variability (RV) computed from the standard deviation of the detrended-smoothed-respiration trace, resp rate variability (RRV) computed from the standard deviation of the period (RRV_std), resp rate variability computed from the root mean square of successive differences between normal breaths (RRV_rmssd) and entropy.
  
